@@ -19,7 +19,7 @@
   // ── Base URL ────────────────────────────────────────────────────────────────
   // Builds the API base URL from the current page's origin so it works on
   // any host (localhost, production, etc.) without hardcoding a URL.
-  const BASE = () => `${window.location.origin}/api/v1`;
+  const BASE = () => `https://gp2-graduation-backend.onrender.com/api/v1`;
 
 
   // ── Token & User helpers ────────────────────────────────────────────────────
