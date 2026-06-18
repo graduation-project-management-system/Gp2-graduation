@@ -1,0 +1,304 @@
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse
+from django.contrib.auth.models import User
+from django.db.models import Count, Q 
+from django.contrib.auth import logout  # حل مشكلة اللوج أوت
+from .models import Team, Membership, Notification, TeamMessage # حل مشكلة المسجات
+from .models import Team, JoinRequest
+
+# 1. قائمة المستخدمين التجريبيين
+from django.contrib.auth import authenticate, login
+from django.shortcuts import render, redirect
+from django.contrib import messages
+
+def index(request):
+    get_token(request)  # ← يجبر Django يعمل token جديد كل مرة
+    if request.method == "POST":
+        email_input = request.POST.get("email")
+        password_input = request.POST.get("password")
+        user = authenticate(request, username=email_input, password=password_input)
+        if user is not None:
+            login(request, user)
+            request.session['user_email'] = user.email
+            request.session['user_name'] = user.first_name
+            if email_input.endswith('@just.edu.jo') and not email_input.endswith('@cit.just.edu.jo'):
+                return redirect('supervisor_dashboard')
+            else:
+                return redirect('student_dashboard')
+        else:
+            return render(request, "index.html", {"error_msg": "الايميل أو كلمة المرور غير صحيحة!"})
+    return render(request, "index.html")
+# 3. لوحة التحكم (Dashboard)
+# views.py
+# 3. لوحة التحكم (Dashboard)
+def student_dashboard(request):
+    # 1. جلب الإيميل من السيشن
+    user_email = request.session.get('user_email')
+    
+    if not user_email:
+        return redirect('index') 
+
+    # 2. جلب كائن المستخدم
+    current_user = get_object_or_404(User, username=user_email)
+
+    # 3. البحث عن فريق (فقط القادة والأعضاء، نستثني الـ Pending)
+    user_membership = Membership.objects.filter(
+        user=current_user
+    ).exclude(role='Pending').first()
+    
+    if user_membership:
+        # الحالة الأولى: الطالب لديه فريق (Leader أو Member)
+        team = user_membership.team
+        # نجلب الطلبات المعلقة لهذا الفريق (فقط إذا كان الطالب هو القائد)
+        pending_requests = Membership.objects.filter(team=team, role='Pending')
+        
+        context = {
+            'team': team,
+            'membership': user_membership,
+            'pending_requests': pending_requests,
+        }
+        # هنا نوجه لصفحة الفريق "team_dashboard.html"
+        return render(request, 'team_page.html', context)
+    
+    else:
+        # الحالة الثانية: الطالب "حر" (ليس لديه فريق أو طلبه لا يزال Pending)
+        # هنا نوجه لصفحة (إنشاء أو انضمام) "student_dashboard.html"
+        return render(request, 'student_dashboard.html')
+# 4. إنشاء فريق جديد
+def create_team(request):
+    
+    user_email = request.session.get('user_email')
+    if not user_email: return redirect('index')
+    user = get_object_or_404(User, username=user_email)
+
+    if Membership.objects.filter(user=user, role__in=['Leader', 'Member']).exists():
+        return redirect('student_dashboard')
+
+    if request.method == "POST":
+        team = Team.objects.create(
+            name=request.POST['team_name'],
+            description=request.POST.get('description', ''),
+            leader=user
+        )
+        Membership.objects.create(user=user, team=team, role='Leader')
+        return redirect('team_page')
+    return render(request, 'create_team.html')
+
+# 5. البحث عن فريق
+def join_team(request):
+    user_email = request.session.get('user_email')
+    if not user_email: return redirect('index')
+    user = get_object_or_404(User, username=user_email)
+
+    teams = Team.objects.annotate(
+        actual_member_count=Count('memberships', filter=Q(memberships__role__in=['Leader', 'Member']))
+    ).order_by('-created_at')
+
+    pending_teams_ids = Membership.objects.filter(user=user, role='Pending').values_list('team_id', flat=True)
+    
+    return render(request, 'join_team.html', {
+        'teams': teams,
+        'pending_teams_ids': list(pending_teams_ids)
+    })
+
+# 6. إرسال طلب انضمام
+def send_join_request(request, team_id):
+    user_email = request.session.get('user_email')
+    if not user_email: return redirect('index')
+    
+    user = get_object_or_404(User, username=user_email)
+    team = get_object_or_404(Team, id=team_id)
+
+    if Membership.objects.filter(user=user, role__in=['Leader', 'Member']).exists():
+        return redirect('student_dashboard')
+        
+    Membership.objects.get_or_create(user=user, team=team, defaults={'role': 'Pending'})
+    Notification.objects.create(user=team.leader, message=f"New request from {user.username} to join {team.name}")
+    
+    return redirect('join_team')
+
+# 7. Workspace
+def team_page(request):
+    user_email = request.session.get('user_email')
+    if not user_email:
+        return redirect('index')
+    
+    user = get_object_or_404(User, username=user_email)
+    
+    membership = Membership.objects.filter(
+        user=user,                  # ← هاد الصح
+        role__in=['Leader', 'Member']
+    ).select_related('team').first()
+    
+    if not membership:
+        return redirect('student_dashboard')
+    
+    pending_requests = Membership.objects.filter(
+        team=membership.team,
+        role='Pending'
+    )
+    
+    return render(request, 'team_page.html', {
+        'team': membership.team,
+        'membership': membership,
+        'pending_requests': pending_requests,
+    })
+
+# 8. التعامل مع الطلبات
+def handle_membership_request(request, membership_id, action):
+    if request.method == "POST":
+        # 1. نجلب الممبرشيب المعنية (الطلب اللي الليدر ضغط عليه)
+        membership = get_object_or_404(Membership, id=membership_id)
+        student = membership.user  # الطالب صاحب الطلب
+
+        if action == 'approve':
+            # 2. نحول حالة الطالب من Pending إلى Member (أو Leader حسب الحاجة)
+            membership.role = 'Member'
+            membership.save()
+
+            # 3. *** الخطوة السحرية ***
+            # نحذف كل الممبرشيب اللي حالتها 'Pending' لهذا الطالب في أي فريق آخر
+            # هيك بنظف الداتابيز وبنلغي كل ريكويستاته الثانية تلقائياً
+            Membership.objects.filter(user=student, role='Pending').delete()
+            
+            # (اختياري) ممكن تبعث نوتيفيكيشن للطالب إنه انقبل
+            Notification.objects.create(user=student, message=f"Congrats! You have been accepted in {membership.team.name}")
+
+        elif action == 'reject':
+            # إذا رفضه، بنحذف بس هاد الريكويست وبنخلي ريكويستاته للفرق الثانية شغالين
+            membership.delete()
+
+        return JsonResponse({'status': 'success'})
+
+    return JsonResponse({'status': 'error'}, status=400)
+
+# 9. مغادرة الفريق
+def leave_team(request):
+    user_email = request.session.get('user_email')
+    if not user_email: return redirect('index')
+    user = get_object_or_404(User, username=user_email)
+    membership = Membership.objects.filter(user=user, role__in=['Leader', 'Member']).first()
+
+    if membership:
+        team = membership.team
+        membership.delete()
+        if not team.memberships.exists():
+            team.delete()
+        elif membership.role == 'Leader':
+            new_leader_mem = team.memberships.first()
+            if new_leader_mem:
+                new_leader_mem.role = 'Leader'
+                new_leader_mem.save()
+                team.leader = new_leader_mem.user
+                team.save()
+    return redirect('student_dashboard')
+
+# 10. المشرفين والرسائل
+def supervisors_list(request):
+    user_email = request.session.get('user_email')
+    if not user_email: return redirect('index')
+    return render(request, 'supervisors_list.html')
+
+def send_message(request, team_id):
+    if request.method == "POST":
+        team = get_object_or_404(Team, id=team_id)
+        user_email = request.session.get('user_email')
+        user = get_object_or_404(User, username=user_email)
+        
+        content = request.POST.get('content', '')
+        file = request.FILES.get('file')
+        
+        if content or file:
+            TeamMessage.objects.create(
+                team=team, user=user, content=content, file=file
+            )
+            return JsonResponse({'status': 'sent'})
+    return JsonResponse({'status': 'error'}, status=400)
+
+def get_messages(request, team_id):
+    messages = TeamMessage.objects.filter(team_id=team_id).order_by('timestamp')
+    data = []
+    for m in messages:
+        data.append({
+            'user': m.user.username,
+            'content': m.content,
+            'file_url': m.file.url if m.file else None,
+            'is_me': m.user.username == request.session.get('user_email'),
+            'time': m.timestamp.strftime('%H:%M')
+        })
+    return JsonResponse({'messages': data})
+
+def logout_user(request):
+    logout(request) # الآن ستعمل لأننا أضفنا الـ import
+    return redirect('index') # عدلتها لـ 'index' لأنه هاد الرابط الافتراضي للوجين عندك
+
+def cancel_join_request(request, team_id):
+    user_email = request.session.get('user_email')
+    user = get_object_or_404(User, username=user_email)
+    
+    # بنحذف الريكويست من جدول الممبرشيب اللي حالته Pending
+    pending_membership = Membership.objects.filter(
+        user=user, 
+        team_id=team_id, 
+        role='Pending'
+    ).first()
+    
+    if pending_membership:
+        print(f"Deleting pending request for {user.username} in team {team_id}")
+        pending_membership.delete()
+    
+    return redirect('join_team')
+
+def approve_request(request, request_id):
+    # بنجيب الممبرشيب اللي حالتها Pending
+    membership = get_object_or_404(Membership, id=request_id)
+    student = membership.user
+    
+    # 1. بنحول حالته من Pending لـ Member
+    membership.role = 'Member'
+    membership.save()
+    
+    # 2. بنحذف أي طلبات ثانية (Pending) لهاد الطالب في فرق ثانية
+    Membership.objects.filter(user=student, role='Pending').delete()
+    
+    return JsonResponse({'status': 'success'})
+
+def supervisor_dashboard(request):
+    user_email = request.session.get('user_email')
+    if not user_email:
+        return redirect('index')
+    
+    user = get_object_or_404(User, username=user_email)
+    
+    if not user.groups.filter(name='Supervisors').exists():
+        return redirect('index')
+    
+    teams = Team.objects.all()
+    
+    return render(request, 'supervisor_dashboard.html', {
+        'teams': teams,
+    })
+
+def dashboard_router(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+    
+    # تحقق إذا اليوزر عنده تيم (عضو أو ليدر)
+    membership = Membership.objects.filter(
+        user=request.user,
+        role__in=['Leader', 'Member']
+    ).select_related('team').first()
+    
+    if membership:
+        # عنده تيم — روّحه على team_page
+        return redirect('team_page')  # أو render مباشرة
+    else:
+        # ما عنده تيم — student_dashboard
+        return render(request, 'student_dashboard.html')
+
+from django.views.decorators.cache import never_cache
+
+@never_cache
+def index(request):
+    if request.method == "POST":
+        ...

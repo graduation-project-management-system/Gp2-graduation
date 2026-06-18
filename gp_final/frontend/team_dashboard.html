@@ -188,7 +188,7 @@ body{display:flex;background:#f4f6fb;color:#0f172a;min-height:100vh}
     </div>
 </div>
 
-<script src="/api.js"></script>
+<script src="/static/api.js?v=2"></script>
 <script>
     if (!GPApi.getAccess()) location.href = '/login.html';
     const me = GPApi.getUser();
@@ -440,32 +440,56 @@ body{display:flex;background:#f4f6fb;color:#0f172a;min-height:100vh}
     async function loadExamDates() {
         const box = document.getElementById('examDatesList');
         try {
-            const dates = await GPApi.getJson(`/teams/${teamId}/exam-dates/`).catch(() => []);
-            if (!dates.length) {
+            const [dates, meetings] = await Promise.all([
+                GPApi.getJson(`/teams/${teamId}/exam-dates/`).catch(() => []),
+                GPApi.getJson('/meetings/').catch(() => []),
+            ]);
+
+            const today = new Date().toISOString().slice(0, 10);
+
+            // Defense meetings for this team
+            const defenses = meetings
+                .filter(m => m.topic && m.topic.startsWith('Defense'))
+                .map(m => ({ date: m.date, time: m.time, label: m.topic, isDefense: true }));
+
+            // Merge exam dates + defense meetings, sorted by date
+            const all = [
+                ...dates.map(d => ({ date: d.date, isDefense: false })),
+                ...defenses,
+            ].sort((a, b) => a.date < b.date ? -1 : 1);
+
+            if (!all.length) {
                 box.innerHTML = '<p class="empty">No exam dates set yet.</p>';
                 return;
             }
-            const today = new Date().toISOString().slice(0, 10);
-            const sorted = [...dates].sort((a, b) => a.date < b.date ? -1 : 1);
-            box.innerHTML = sorted.map(d => {
-                const isPast = d.date < today;
+
+            box.innerHTML = all.map(d => {
+                const isPast  = d.date < today;
                 const dateObj = new Date(d.date + 'T00:00:00');
                 const formatted = dateObj.toLocaleDateString('en-GB', {
                     weekday: 'short', day: 'numeric', month: 'long', year: 'numeric'
                 });
                 const daysLeft = Math.round((dateObj - new Date()) / 86400000);
-                const label = isPast ? 'Passed'
+                const countdown = isPast ? 'Passed'
                     : daysLeft === 0 ? 'Today!'
                     : daysLeft === 1 ? 'Tomorrow!'
                     : `${daysLeft} days left`;
+
+                const icon  = d.isDefense ? 'fas fa-shield-halved' : 'fas fa-star';
+                const color = d.isDefense ? '#7c3aed' : (isPast ? '#94a3b8' : daysLeft <= 3 ? '#dc2626' : '#64748b');
+                const bg    = d.isDefense ? '#ede9fe' : (isPast ? '#f1f5f9' : '#fef3c7');
+                const timeStr = d.time ? ` · ${d.time.slice(0,5)}` : '';
+                const sublabel = d.isDefense ? (d.label + timeStr) : '';
+
                 return `
                     <div class="exam-item">
-                        <span class="exam-badge ${isPast ? 'past' : ''}">
-                            <i class="fas fa-star"></i> ${formatted}
+                        <span class="exam-badge" style="background:${bg};color:${color};">
+                            <i class="${icon}"></i> ${formatted}
                         </span>
-                        <span style="font-size:12px;color:${isPast ? '#94a3b8' : daysLeft <= 3 ? '#dc2626' : '#64748b'};font-weight:600">
-                            ${label}
-                        </span>
+                        <div>
+                            ${sublabel ? `<div style="font-size:11px;color:#7c3aed;font-weight:600;margin-bottom:2px">${sublabel}</div>` : ''}
+                            <span style="font-size:12px;color:${isPast ? '#94a3b8' : daysLeft <= 3 ? '#dc2626' : '#64748b'};font-weight:600">${countdown}</span>
+                        </div>
                     </div>`;
             }).join('');
         } catch(e) {
@@ -477,7 +501,9 @@ body{display:flex;background:#f4f6fb;color:#0f172a;min-height:100vh}
     async function loadMeetings() {
         const box = document.getElementById('meetingsList');
         try {
-            const meetings = await GPApi.getJson('/meetings/').catch(() => []);
+            const all = await GPApi.getJson('/meetings/').catch(() => []);
+            // Show only supervisor meetings, not defense sessions (those appear in Exam Dates)
+            const meetings = all.filter(m => !m.topic || !m.topic.startsWith('Defense'));
             if (!meetings.length) {
                 box.innerHTML = '<p class="empty">No discussions scheduled yet.</p>';
                 return;

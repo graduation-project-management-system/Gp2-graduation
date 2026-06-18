@@ -37,6 +37,7 @@ class SupervisorRequest(models.Model):
         blank=True,
         limit_choices_to={'role': 'supervisor'},
     )
+    project_file  = models.FileField(upload_to='request_files/', null=True, blank=True)
     status        = models.CharField(max_length=20, choices=ReqStatus.choices, default=ReqStatus.PENDING)
     approved_by   = models.ForeignKey(
         settings.AUTH_USER_MODEL,

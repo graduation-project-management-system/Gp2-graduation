@@ -140,9 +140,14 @@ class DjangoMeetingRepository(IMeetingRepository):
         )
 
     def get_by_supervisor(self, supervisor_id: int) -> List[MeetingEntity]:
+        from django.db.models import Q
         meetings = (
             Meeting.objects
-            .filter(supervisor_id=supervisor_id)
+            .filter(
+                Q(supervisor_id=supervisor_id) |
+                Q(examiner1_id=supervisor_id) |
+                Q(examiner2_id=supervisor_id)
+            )
             .select_related('team')
             .order_by('date', 'time')
         )
@@ -193,31 +198,42 @@ class DjangoMeetingRepository(IMeetingRepository):
 class DjangoGradingReportRepository(IGradingReportRepository):
 
     def get_by_supervisor(self, supervisor_id: int) -> List[GradingReportEntity]:
+        from django.db.models import Q
+        examiner_team_ids = Meeting.objects.filter(
+            Q(examiner1_id=supervisor_id) | Q(examiner2_id=supervisor_id)
+        ).values_list('team_id', flat=True)
         reports = (
             GradingReport.objects
-            .filter(supervisor_id=supervisor_id)
+            .filter(Q(supervisor_id=supervisor_id) | Q(team_id__in=examiner_team_ids))
             .select_related('team')
+            .distinct()
         )
         return [self._to_entity(r) for r in reports]
 
     def create(self, entity: GradingReportEntity) -> GradingReportEntity:
-        r = GradingReport.objects.create(
-            supervisor_id=entity.supervisor_id,
+        defaults = {
+            'supervisor_id': entity.supervisor_id,
+            'chief_grade':   entity.grade.chief_grade,
+            'feedback':      entity.feedback,
+        }
+        # Only update examiner grades when explicitly provided (don't overwrite existing ones with None)
+        if entity.grade.examiner_one_grade is not None:
+            defaults['examiner_one_grade'] = entity.grade.examiner_one_grade
+        if entity.grade.examiner_two_grade is not None:
+            defaults['examiner_two_grade'] = entity.grade.examiner_two_grade
+        r, _ = GradingReport.objects.update_or_create(
             team_id=entity.team_id,
             phase=entity.phase.value,
-            chief_grade=entity.grade.chief_grade,
-            examiner_one_grade=entity.grade.examiner_one_grade,
-            examiner_two_grade=entity.grade.examiner_two_grade,
-            feedback=entity.feedback,
+            defaults=defaults,
         )
         return self._to_entity(r)
 
     @staticmethod
     def _to_entity(r: GradingReport) -> GradingReportEntity:
         grade = WeightedGrade(
-            chief_grade=float(r.chief_grade),
-            examiner_one_grade=float(r.examiner_one_grade),
-            examiner_two_grade=float(r.examiner_two_grade),
+            chief_grade=float(r.chief_grade) if r.chief_grade is not None else 0.0,
+            examiner_one_grade=float(r.examiner_one_grade) if r.examiner_one_grade is not None else None,
+            examiner_two_grade=float(r.examiner_two_grade) if r.examiner_two_grade is not None else None,
         )
         return GradingReportEntity(
             id=r.pk,

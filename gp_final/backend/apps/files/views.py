@@ -5,6 +5,7 @@ from rest_framework.response import Response
 
 from apps.teams.models import Team
 from apps.accounts.models import UserRole
+from apps.notifications.utils import push_notification
 from .models import TeamFile
 from .serializers import TeamFileSerializer
 
@@ -33,6 +34,17 @@ def list_files(request):
             return Response({'error': 'Not authorised to upload to this team.'}, status=403)
 
         tf = TeamFile.objects.create(team=team, uploader=user, file=file, file_name=file.name)
+
+        # Notify supervisor when a student uploads a file
+        if user.role == UserRole.STUDENT and team.assigned_supervisor:
+            push_notification(
+                recipient_id=team.assigned_supervisor.pk,
+                title='New file uploaded',
+                message=f'{user.display_name} uploaded "{file.name}" for team {team.name}.',
+                notif_type='file_uploaded',
+                team_name=team.name,
+            )
+
         return Response(TeamFileSerializer(tf, context={'request': request}).data, status=201)
 
     # GET

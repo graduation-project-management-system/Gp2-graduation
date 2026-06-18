@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Team Chat</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Inter;
+}
+
+body{
+    display:flex;
+    height:100vh;
+    background:#f4f6fb;
+}
+
+/* زر فتح السايدبار */
+.open-sidebar{
+    position:fixed;
+    top:15px;
+    left:15px;
+    font-size:20px;
+    color:#1e3c72;
+    cursor:pointer;
+    z-index:999;
+    display:block;
+}
+
+/* SIDEBAR */
+.sidebar{
+    width:260px;
+    background:linear-gradient(180deg,#1e3c72,#2a5298);
+    color:#fff;
+    padding:20px;
+    transition:0.3s;
+}
+
+/* عند الإخفاء */
+.sidebar.closed{
+    width:0;
+    padding:0;
+    overflow:hidden;
+}
+
+/* أزرار داخل البانيل */
+.side-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+}
+
+.back-btn,
+.toggle-btn{
+    cursor:pointer;
+    font-size:18px;
+    color:#fff;
+}
+
+.sidebar h2{
+    margin-bottom:10px;
+}
+
+.count{
+    font-size:13px;
+    opacity:.8;
+    margin-bottom:15px;
+}
+
+.member{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px;
+    border-radius:10px;
+    margin-bottom:8px;
+    background:rgba(255,255,255,0.1);
+}
+
+.member img{
+    width:35px;
+    height:35px;
+    border-radius:50%;
+}
+
+.status{
+    font-size:11px;
+    opacity:.7;
+}
+
+/* CHAT */
+.chat{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+}
+
+/* HEADER */
+.chat-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:15px;
+    background:#fff;
+    border-bottom:1px solid #eee;
+}
+
+.icons i{
+    margin-left:15px;
+    cursor:pointer;
+    font-size:18px;
+    color:#1e3c72;
+}
+
+/* MESSAGES */
+.messages{
+    flex:1;
+    padding:15px;
+    overflow-y:auto;
+}
+
+.msg{
+    max-width:60%;
+    padding:10px;
+    border-radius:12px;
+    margin-bottom:10px;
+    position:relative;
+}
+
+.me{
+    background:#d1fae5;
+    margin-left:auto;
+}
+
+.other{
+    background:#fff;
+}
+
+.options{
+    position:absolute;
+    top:5px;
+    right:5px;
+    cursor:pointer;
+}
+
+/* MENU */
+.menu{
+    position:absolute;
+    top:25px;
+    right:0;
+    background:#fff;
+    border:1px solid #ddd;
+    border-radius:8px;
+    display:none;
+}
+
+.menu div{
+    padding:8px 12px;
+    cursor:pointer;
+}
+
+.menu div:hover{
+    background:#eee;
+}
+
+/* INPUT */
+.input{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px;
+    background:#fff;
+    border-top:1px solid #eee;
+}
+
+.input i{
+    font-size:18px;
+    cursor:pointer;
+    color:#1e3c72;
+}
+
+.input input{
+    flex:1;
+    padding:10px;
+    border-radius:20px;
+    border:1px solid #ccc;
+}
+
+.send{
+    background:#1e3c72;
+    color:#fff;
+    border:none;
+    padding:10px 15px;
+    border-radius:50%;
+    cursor:pointer;
+}
+
+</style>
+</head>
+
+<body>
+
+<!-- زر فتح السايدبار -->
+<i class="fa-solid fa-bars open-sidebar" onclick="toggleSidebar()"></i>
+
+<!-- SIDEBAR -->
+<div class="sidebar" id="sidebar">
+
+    <div class="side-top">
+        <i class="fa-solid fa-arrow-left back-btn" onclick="goBack()"></i>
+        <i class="fa-solid fa-bars toggle-btn" onclick="toggleSidebar()"></i>
+    </div>
+
+    <h2>Team Members</h2>
+    <div class="count">5 Members</div>
+
+    <div class="member">
+        <img src="https://i.pravatar.cc/100?img=1">
+        <div>
+            Ali (Leader)
+            <div class="status">online</div>
+        </div>
+    </div>
+
+    <div class="member">
+        <img src="https://i.pravatar.cc/100?img=2">
+        <div>Sara<div class="status">online</div></div>
+    </div>
+
+    <div class="member">
+        <img src="https://i.pravatar.cc/100?img=3">
+        <div>Omar<div class="status">online</div></div>
+    </div>
+
+    <div class="member">
+        <img src="https://i.pravatar.cc/100?img=4">
+        <div>Lina<div class="status">online</div></div>
+    </div>
+
+    <div class="member">
+        <img src="https://i.pravatar.cc/100?img=5">
+        <div>Ahmad<div class="status">offline</div></div>
+    </div>
+
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Team Chat</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Inter;
+}
+
+body{
+    display:flex;
+    height:100vh;
+    background:#f4f6fb;
+}
+
+/* زر فتح السايدبار */
+.open-sidebar{
+    position:fixed;
+    top:15px;
+    left:15px;
+    font-size:20px;
+    color:#1e3c72;
+    cursor:pointer;
+    z-index:999;
+    display:block;
+}
+
+/* SIDEBAR */
+.sidebar{
+    width:260px;
+    background:linear-gradient(180deg,#1e3c72,#2a5298);
+    color:#fff;
+    padding:20px;
+    transition:0.3s;
+}
+
+/* عند الإخفاء */
+.sidebar.closed{
+    width:0;
+    padding:0;
+    overflow:hidden;
+}
+
+/* أزرار داخل البانيل */
+.side-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+}
+
+.back-btn,
+.toggle-btn{
+    cursor:pointer;
+    font-size:18px;
+    color:#fff;
+}
+
+.sidebar h2{
+    margin-bottom:10px;
+}
+
+.count{
+    font-size:13px;
+    opacity:.8;
+    margin-bottom:15px;
+}
+
+.member{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px;
+    border-radius:10px;
+    margin-bottom:8px;
+    background:rgba(255,255,255,0.1);
+}
+
+.member img{
+    width:35px;
+    height:35px;
+    border-radius:50%;
+}
+
+.status{
+    font-size:11px;
+    opacity:.7;
+}
+
+/* CHAT */
+.chat{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+}
+
+/* HEADER */
+.chat-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:15px;
+    background:#fff;
+    border-bottom:1px solid #eee;
+}
+
+.icons i{
+    margin-left:15px;
+    cursor:pointer;
+    font-size:18px;
+    color:#1e3c72;
+}
+
+/* MESSAGES */
+.messages{
+    flex:1;
+    padding:15px;
+    overflow-y:auto;
+}
+
+.msg{
+    max-width:60%;
+    padding:10px;
+    border-radius:12px;
+    margin-bottom:10px;
+    position:relative;
+}
+
+.me{
+    background:#d1fae5;
+    margin-left:auto;
+}
+
+.other{
+    background:#fff;
+}
+
+.options{
+    position:absolute;
+    top:5px;
+    right:5px;
+    cursor:pointer;
+}
+
+/* MENU */
+.menu{
+    position:absolute;
+    top:25px;
+    right:0;
+    background:#fff;
+    border:1px solid #ddd;
+    border-radius:8px;
+    display:none;
+}
+
+.menu div{
+    padding:8px 12px;
+    cursor:pointer;
+}
+
+.menu div:hover{
+    background:#eee;
+}
+
+/* INPUT */
+.input{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px;
+    background:#fff;
+    border-top:1px solid #eee;
+}
+
+.input i{
+    font-size:18px;
+    cursor:pointer;
+    color:#1e3c72;
+}
+
+.input input{
+    flex:1;
+    padding:10px;
+    border-radius:20px;
+    border:1px solid #ccc;
+}
+
+.send{
+    background:#1e3c72;
+    color:#fff;
+    border:none;
+    padding:10px 15px;
+    border-radius:50%;
+    cursor:pointer;
+}
+
+</style>
+</head>
+
+<body>
+
+<!-- زر فتح السايدبار -->
+<i class="fa-solid fa-bars open-sidebar" onclick="toggleSidebar()"></i>
+
+<!-- SIDEBAR -->
+<div class="sidebar" id="sidebar">
+
+    <div class="side-top">
+        <i class="fa-solid fa-arrow-left back-btn" onclick="goBack()"></i>
+        <i class="fa-solid fa-bars toggle-btn" onclick="toggleSidebar()"></i>
+    </div>
+
+    <h2>Team Members</h2>
+    <div class="count">5 Members</div>
+
+    <div class="member">
+        <img src="https://i.pravatar.cc/100?img=1">
+        <div>
+            Ali (Leader)
+            <div class="status">online</div>
+        </div>
+    </div>
+
+    <div class="member">
+        <img src="https://i.pravatar.cc/100?img=2">
+        <div>Sara<div class="status">online</div></div>
+    </div>
+
+    <div class="member">
+        <img src="https://i.pravatar.cc/100?img=3">
+        <div>Omar<div class="status">online</div></div>
+    </div>
+
+    <div class="member">
+        <img src="https://i.pravatar.cc/100?img=4">
+        <div>Lina<div class="status">online</div></div>
+    </div>
+
+    <div class="member">
+        <img src="https://i.pravatar.cc/100?img=5">
+        <div>Ahmad<div class="status">offline</div></div>
+    </div>
+ 
+  <div class="sidebar-footer">
+    <a href="team_dashboard.html" class="back-dashboard-btn">
+        <i class="fa-solid fa-house"></i> Team Dashboard
+    </a>
+</div>
+</div>
+
+<!-- CHAT -->
+<div class="chat">
+
+<div class="chat-header">
+    <b>Project Team Chat</b>
+    <div class="icons">
+        <i class="fa-solid fa-phone"></i>
+        <i class="fa-solid fa-video"></i>
+    </div>
+</div>
+
+<div class="messages" id="messages"></div>
+
+<div class="input">
+    <i class="fa-solid fa-paperclip"></i>
+    <i class="fa-solid fa-image"></i>
+    <i class="fa-solid fa-microphone"></i>
+
+    <input type="text" id="msgInput" placeholder="Write a message...">
+
+    <button class="send" onclick="sendMsg()">
+        <i class="fa-solid fa-paper-plane"></i>
+    </button>
+</div>
+
+</div>
+
+<script>
+
+let messages = [];
+
+function render(){
+    const box = document.getElementById("messages");
+    box.innerHTML = "";
+
+    messages.forEach((m,i)=>{
+        box.innerHTML += `
+        <div class="msg ${m.me ? 'me':'other'}">
+            ${m.text}
+            <div class="options" onclick="toggleMenu(${i})">⋮</div>
+
+            <div class="menu" id="menu-${i}">
+                <div onclick="editMsg(${i})">Edit</div>
+                <div onclick="deleteMe(${i})">Delete for me</div>
+                <div onclick="deleteAll(${i})">Delete for everyone</div>
+            </div>
+        </div>
+        `;
+    });
+
+    box.scrollTop = box.scrollHeight;
+}
+
+function sendMsg(){
+    const input = document.getElementById("msgInput");
+
+    if(input.value.trim() === "") return;
+
+    messages.push({text: input.value, me:true});
+    input.value="";
+    render();
+}
+
+function toggleMenu(i){
+    const menu = document.getElementById(`menu-${i}`);
+    menu.style.display = menu.style.display === "block" ? "none":"block";
+}
+
+function editMsg(i){
+    let newText = prompt("Edit message:");
+    if(newText){
+        messages[i].text = newText;
+        render();
+    }
+}
+
+function deleteMe(i){
+    messages.splice(i,1);
+    render();
+}
+
+function deleteAll(i){
+    messages[i].text = "Message deleted";
+    render();
+}
+
+document.getElementById("msgInput").addEventListener("keypress", function(e){
+    if(e.key === "Enter"){
+        sendMsg();
+    }
+});
+
+function goBack(){
+    window.history.back();
+}
+
+function toggleSidebar(){
+    const sidebar = document.getElementById("sidebar");
+    sidebar.classList.toggle("closed");
+}
+
+</script>
+
+</body>
+</html>
+</div>
+
+<!-- CHAT -->
+<div class="chat">
+
+<div class="chat-header">
+    <b>Project Team Chat</b>
+    <div class="icons">
+        <i class="fa-solid fa-phone"></i>
+        <i class="fa-solid fa-video"></i>
+    </div>
+</div>
+
+<div class="messages" id="messages"></div>
+
+<div class="input">
+    <i class="fa-solid fa-paperclip"></i>
+    <i class="fa-solid fa-image"></i>
+    <i class="fa-solid fa-microphone"></i>
+
+    <input type="text" id="msgInput" placeholder="Write a message...">
+
+    <button class="send" onclick="sendMsg()">
+        <i class="fa-solid fa-paper-plane"></i>
+    </button>
+</div>
+
+</div>
+
+<script>
+
+let messages = [];
+
+function render(){
+    const box = document.getElementById("messages");
+    box.innerHTML = "";
+
+    messages.forEach((m,i)=>{
+        box.innerHTML += `
+        <div class="msg ${m.me ? 'me':'other'}">
+            ${m.text}
+            <div class="options" onclick="toggleMenu(${i})">⋮</div>
+
+            <div class="menu" id="menu-${i}">
+                <div onclick="editMsg(${i})">Edit</div>
+                <div onclick="deleteMe(${i})">Delete for me</div>
+                <div onclick="deleteAll(${i})">Delete for everyone</div>
+            </div>
+        </div>
+        `;
+    });
+
+    box.scrollTop = box.scrollHeight;
+}
+
+function sendMsg(){
+    const input = document.getElementById("msgInput");
+
+    if(input.value.trim() === "") return;
+
+    messages.push({text: input.value, me:true});
+    input.value="";
+    render();
+}
+
+function toggleMenu(i){
+    const menu = document.getElementById(`menu-${i}`);
+    menu.style.display = menu.style.display === "block" ? "none":"block";
+}
+
+function editMsg(i){
+    let newText = prompt("Edit message:");
+    if(newText){
+        messages[i].text = newText;
+        render();
+    }
+}
+
+function deleteMe(i){
+    messages.splice(i,1);
+    render();
+}
+
+function deleteAll(i){
+    messages[i].text = "Message deleted";
+    render();
+}
+
+document.getElementById("msgInput").addEventListener("keypress", function(e){
+    if(e.key === "Enter"){
+        sendMsg();
+    }
+});
+
+function goBack(){
+    window.history.back();
+}
+
+function toggleSidebar(){
+    const sidebar = document.getElementById("sidebar");
+    sidebar.classList.toggle("closed");
+}
+
+</script>
+
+</body>
+</html>

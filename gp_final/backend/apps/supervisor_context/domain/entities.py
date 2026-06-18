@@ -101,7 +101,7 @@ class GradingReportEntity:
     created_at:    Optional[datetime.datetime] = None
 
     @property
-    def final_grade(self) -> float:
+    def final_grade(self) -> Optional[float]:
         return self.grade.final_grade
 
 

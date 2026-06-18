@@ -11,7 +11,7 @@ class GradingReportSerializer(serializers.ModelSerializer):
     class Meta:
         model  = GradingReport
         fields = [
-            'id', 'team_name', 'supervisor_name', 'phase',
+            'id', 'team_id', 'team_name', 'supervisor_name', 'phase',
             'chief_grade', 'examiner_one_grade', 'examiner_two_grade',
             'final_grade', 'feedback', 'archived_file_url', 'created_at',
         ]
@@ -28,19 +28,19 @@ class GradingReportCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = GradingReport
-        fields = [
-            'team_id', 'phase',
-            'chief_grade', 'examiner_one_grade', 'examiner_two_grade',
-            'feedback', 'archived_file',
-        ]
+        fields = ['team_id', 'phase', 'chief_grade', 'feedback', 'archived_file']
         extra_kwargs = {'archived_file': {'required': False}}
 
-    def validate(self, data):
-        for field in ('chief_grade', 'examiner_one_grade', 'examiner_two_grade'):
-            val = float(data.get(field, 0))
-            if not (0 <= val <= 100):
-                raise serializers.ValidationError({field: 'Grade must be between 0 and 100.'})
-        return data
+    def validate_chief_grade(self, val):
+        if not (0 <= float(val) <= 100):
+            raise serializers.ValidationError('Grade must be between 0 and 100.')
+        return val
+
+
+class ExaminerGradeSerializer(serializers.Serializer):
+    team_id = serializers.IntegerField()
+    phase   = serializers.ChoiceField(choices=['Proposal', 'Midterm', 'Final'])
+    grade   = serializers.DecimalField(max_digits=5, decimal_places=2, min_value=0, max_value=100)
 
 
 class GradePreviewSerializer(serializers.Serializer):

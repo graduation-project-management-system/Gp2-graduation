@@ -38,6 +38,8 @@ class Team(models.Model):
     )
     progress            = models.PositiveSmallIntegerField(default=0)   # 0-100
     academic_year       = models.CharField(max_length=10, default='2025-2026')
+    is_archived         = models.BooleanField(default=False)
+    archive_date        = models.DateTimeField(null=True, blank=True)
     created_at          = models.DateTimeField(auto_now_add=True)
     updated_at          = models.DateTimeField(auto_now=True)
 

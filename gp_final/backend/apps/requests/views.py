@@ -83,6 +83,7 @@ def create_request(request):
         current_index=0,
         target_supervisor=first_sup,
         status='pending',
+        project_file=project_file if project_file else None,
     )
 
     # 6. إذا كنتِ ترغبين بتحديث بيانات الطلاب بالفريق فوراً بناءً على الحقل الممرر
@@ -103,7 +104,7 @@ def create_request(request):
         team_name=team.name,
     )
 
-    return Response(SupervisorRequestSerializer(req).data, status=201)
+    return Response(SupervisorRequestSerializer(req, context={'request': request}).data, status=201)
 
 # ── List requests for the current user ───────────────────────────────────────
 @api_view(['GET'])
@@ -124,7 +125,7 @@ def list_requests(request):
     else:
         qs = SupervisorRequest.objects.all()
 
-    return Response(SupervisorRequestSerializer(qs, many=True).data)
+    return Response(SupervisorRequestSerializer(qs, many=True, context={'request': request}).data)
 
 
 # ── Decide (approve / reject) ─────────────────────────────────────────────────

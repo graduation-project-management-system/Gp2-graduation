@@ -19,7 +19,7 @@
   // ── Base URL ────────────────────────────────────────────────────────────────
   // Builds the API base URL from the current page's origin so it works on
   // any host (localhost, production, etc.) without hardcoding a URL.
-  const BASE = () => `https://gp2-graduation-backend.onrender.com/api/v1`;
+  const BASE = () => `${window.location.origin}/api/v1`;
 
 
   // ── Token & User helpers ────────────────────────────────────────────────────
@@ -89,7 +89,7 @@
     const r = getRefresh();
     if (!r) return false; // no refresh token available — must log in again
 
-    const res = await fetch(`https://gp2-graduation-backend.onrender.com/api/v1/auth/token/refresh/`, {
+    const res = await fetch(`${window.location.origin}/api/v1/auth/token/refresh/`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ refresh: r }),

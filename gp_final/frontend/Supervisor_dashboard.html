@@ -17,7 +17,7 @@
       color: #fff; min-height: 100vh; padding: 30px 20px;
       display: flex; flex-direction: column;
     }
-    .profile { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; cursor: pointer; }
+    .profile { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
     .profile img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,.2); }
     .profile h3 { font-size: 0.95rem; font-weight: 700; }
     .profile span { font-size: 0.78rem; color: rgba(255,255,255,.65); }
@@ -123,13 +123,12 @@
 
 <!-- ── Sidebar ── -->
 <aside class="sidebar">
-  <div class="profile" onclick="document.getElementById('imageInput').click()" title="Click to change avatar">
+  <div class="profile">
     <img id="supAvatar" src="https://ui-avatars.com/api/?name=S&background=ffffff&color=1e3c72" alt="avatar" />
     <div>
       <h3 id="supName">Supervisor</h3>
       <span>Supervisor</span>
     </div>
-    <input type="file" id="imageInput" hidden accept="image/*" />
   </div>
 
   <nav class="menu">
@@ -210,7 +209,7 @@
 
 </main>
 
-<script src="/api.js"></script>
+<script src="/static/api.js?v=2"></script>
 <script>
   (async function () {
     // ── Auth guard ──
@@ -227,18 +226,6 @@
     const savedImg = localStorage.getItem('profileImg_' + user.email);
     document.getElementById('supAvatar').src = savedImg ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=ffffff&color=1e3c72`;
-
-    // Avatar upload
-    document.getElementById('imageInput').onchange = function (e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        localStorage.setItem('profileImg_' + user.email, ev.target.result);
-        document.getElementById('supAvatar').src = ev.target.result;
-      };
-      reader.readAsDataURL(file);
-    };
 
     // Logout
     document.getElementById('btn-logout').onclick = async () => {

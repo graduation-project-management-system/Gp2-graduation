@@ -143,7 +143,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Optional fields — used in supervisor profiles and student registration
     department   = models.CharField(max_length=150, blank=True)
     expertise    = models.CharField(max_length=255, blank=True)
-
+    gpa = models.DecimalField(max_digits=3,decimal_places=2,null=True,blank=True)
+    gpa = models.DecimalField(
+    max_digits=3,
+    decimal_places=2,
+    null=True,
+    blank=True
+)
     # Optional profile picture — stored in MEDIA_ROOT/avatars/ on the server
     avatar       = models.ImageField(upload_to='avatars/', null=True, blank=True)
 

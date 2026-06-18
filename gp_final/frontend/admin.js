@@ -21,6 +21,7 @@ const GRADES_API_URL = `${API_BASE_URL}/api/grades/`;
 const GRADE_CREATE_API_URL = `${API_BASE_URL}/api/grades/create/`;
 const DASHBOARD_API_URL = `${API_BASE_URL}/api/dashboard/`;
 const ACTIVITY_API_URL = `${API_BASE_URL}/api/activity/`;
+const FILES_API_URL = `${API_BASE_URL}/api/v1/files/`;
 
 /* Type config for activity */
 const ACT_CONFIG = {
@@ -58,10 +59,104 @@ let pendingDeleteStudentId = null;
 let supervisorModalEditingId = null;
 let pendingDeleteSupervisorId = null;
 let proposalModalEditingId = null;
+let archivedTeamsState = [];
 let pendingDeleteProposalId = null;
 let teamModalEditingId = null;
 let gradeModalEditingId = null;
 let pendingDeleteGradeId = null;
+
+const TEAM_MAX_MEMBERS = 5;
+const SUPERVISOR_CAPACITY = 5;
+
+function getSelectedTeamMemberIds(listId) {
+    const container = document.getElementById(listId);
+    if (!container) return [];
+    return Array.from(container.querySelectorAll('input[type="checkbox"][name="team_member"]:checked'))
+        .map((checkbox) => Number(checkbox.value));
+}
+
+function setTeamMembersError(errorId, message) {
+    const el = document.getElementById(errorId);
+    if (!el) return;
+    if (message) {
+        el.textContent = message;
+        el.classList.add("show");
+    } else {
+        el.textContent = "";
+        el.classList.remove("show");
+    }
+}
+
+function updateTeamMembersSummary(listId, noteId, errorId) {
+    const selectedIds = getSelectedTeamMemberIds(listId);
+    const noteEl = document.getElementById(noteId);
+    const container = document.getElementById(listId);
+    if (noteEl) {
+        noteEl.textContent = `${selectedIds.length} / ${TEAM_MAX_MEMBERS} selected.`;
+    }
+    if (container) {
+        const checkboxes = Array.from(container.querySelectorAll('input[type="checkbox"][name="team_member"]'));
+        const disableRemaining = selectedIds.length >= TEAM_MAX_MEMBERS;
+        checkboxes.forEach((checkbox) => {
+            if (!checkbox.checked) {
+                checkbox.disabled = disableRemaining;
+            } else {
+                checkbox.disabled = false;
+            }
+        });
+    }
+    if (selectedIds.length > TEAM_MAX_MEMBERS) {
+        setTeamMembersError(errorId, `Maximum team size is ${TEAM_MAX_MEMBERS} students.`);
+    } else {
+        setTeamMembersError(errorId, "");
+    }
+}
+
+function handleTeamMembersToggle(event) {
+    const container = event.currentTarget;
+    if (!container) return;
+    const listId = container.id;
+    const errorId = listId === "add-team-members-list" ? "add-team-members-error" : "edit-team-members-error";
+    const noteId = listId === "add-team-members-list" ? "add-team-members-note" : "edit-team-members-note";
+    const selectedIds = getSelectedTeamMemberIds(listId);
+
+    if (selectedIds.length > TEAM_MAX_MEMBERS) {
+        event.target.checked = false;
+        setTeamMembersError(errorId, `Maximum team size is ${TEAM_MAX_MEMBERS} students.`);
+    } else {
+        setTeamMembersError(errorId, "");
+    }
+    updateTeamMembersSummary(listId, noteId, errorId);
+}
+
+function renderTeamMembersList(listId, selectedIds = []) {
+    const container = document.getElementById(listId);
+    if (!container) return;
+
+    const currentTeamId = listId === 'edit-team-members-list' ? teamModalEditingId : null;
+    const rows = studentsState.map((student) => {
+        const studentName = escapeHtml(student.name || student.display_name || student.email || `Student #${student.id}`);
+        const checked = selectedIds.includes(student.id) ? "checked" : "";
+        const assignedElsewhere = student.team_id != null && String(student.team_id) !== String(currentTeamId);
+        const disabled = assignedElsewhere ? "disabled" : "";
+        const tooltip = assignedElsewhere ? `title="Already assigned to ${escapeHtml(student.team || 'another team')}"` : "";
+        return `
+          <div class="team-member-row${assignedElsewhere ? ' disabled' : ''}">
+            <label ${tooltip}>
+              <input type="checkbox" name="team_member" value="${student.id}" ${checked} ${disabled} />
+              <span class="team-member-name">${studentName}</span>
+            </label>
+          </div>
+        `;
+    });
+
+    container.innerHTML = rows.join("") || `<div class="team-member-row empty">No students available.</div>`;
+    container.removeEventListener("change", handleTeamMembersToggle);
+    container.addEventListener("change", handleTeamMembersToggle);
+    const errorId = listId === "add-team-members-list" ? "add-team-members-error" : "edit-team-members-error";
+    const noteId = listId === "add-team-members-list" ? "add-team-members-note" : "edit-team-members-note";
+    updateTeamMembersSummary(listId, noteId, errorId);
+}
 
 /* ============================================
    NAVIGATION
@@ -97,6 +192,7 @@ function showSection(id, clickedEl) {
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
   if (clickedEl) clickedEl.classList.add("active");
   if (id === "activity") void loadActivity();
+  if (id === "archive") void loadArchive();
 }
 
 /* ============================================
@@ -219,7 +315,7 @@ async function openProposalModal(proposal = null) {
   const teamSelect = document.getElementById("proposal-team-select");
   if (teamSelect) {
     teamSelect.innerHTML = [
-      `<option value="" disabled selected>Choose a team...</option>`,
+      `<option value="" disabled selected>Unassigned</option>`,
       ...teamsState.map((t) => `<option value="${t.id}">${escapeHtml(String(t.name || `Team #${t.id}`))}</option>`),
     ].join("");
   }
@@ -227,10 +323,13 @@ async function openProposalModal(proposal = null) {
   const supervisorSelect = document.getElementById("proposal-supervisor-select");
   if (supervisorSelect) {
     const options = supervisorsState.map((s) => {
-      const label = getSupervisorFullName(s);
-      const userId = s?.user?.id;
-      return userId ? `<option value="${userId}">${escapeHtml(label)}</option>` : "";
-    }).filter(Boolean);
+     const label = getSupervisorFullName(s);
+     const supervisorId = s.id;
+
+     return supervisorId
+       ? `<option value="${supervisorId}">${escapeHtml(label)}</option>`
+       : "";
+      }).filter(Boolean);
     supervisorSelect.innerHTML = [
       `<option value="" disabled selected>Choose a supervisor...</option>`,
       ...options,
@@ -298,9 +397,13 @@ async function submitProposalForm(event) {
       body: formData,
     });
     const data = await response.json().catch(() => null);
-    if (!response.ok || !data?.success) {
-      throw new Error(getJsonErrorMessage(data, `Failed to save proposal (${response.status})`));
-    }
+
+    console.log("PROPOSAL RESPONSE =", data);
+
+         if (!response.ok || !data?.success) {
+             throw new Error(JSON.stringify(data));
+           }
+    
 
     closeModal("add-proposal-modal");
     form.reset();
@@ -658,6 +761,22 @@ function renderSupervisors() {
   }).join("");
 
   updateSupervisorStats();
+  _populateExaminerSelects();
+}
+
+function _populateExaminerSelects() {
+  const options = '<option value="">— None —</option>' +
+    supervisorsState.map(s =>
+      `<option value="${s.id}">${escapeHtml(getSupervisorFullName(s))}</option>`
+    ).join('');
+  ['schedule-examiner1-select','schedule-examiner2-select',
+   'edit-examiner1-select','edit-examiner2-select'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const cur = el.value;
+    el.innerHTML = options;
+    if (cur) el.value = cur;
+  });
 }
 
 async function loadSupervisors() {
@@ -693,9 +812,9 @@ async function loadSupervisors() {
       id: s.id,
       user: { first_name: s.display_name, last_name: '', email: s.email, username: s.display_name },
       department:     s.department || '—',
-      capacity:       5,
+      capacity:       SUPERVISOR_CAPACITY,
       assigned_count: (teamsBySup[s.id] || []).length,
-      teams:          (teamsBySup[s.id] || []).map(t => ({ name: t.name })),
+      teams:          (teamsBySup[s.id] || []).map(t => ({ id: t.id, name: t.name })),
     }));
   } catch (error) {
     console.error("[Supervisors] Error loading supervisors:", error);
@@ -710,6 +829,22 @@ function getSupervisorFullName(supervisor) {
   const lastName = String(supervisor?.user?.last_name || "").trim();
   const fallbackName = String(supervisor?.user?.username || "Supervisor").trim();
   return `${firstName} ${lastName}`.trim() || fallbackName;
+}
+
+function isSupervisorFull(supervisor) {
+  const capacity = Number(supervisor?.capacity || SUPERVISOR_CAPACITY);
+  const assigned = Number(supervisor?.assigned_count || 0);
+  return capacity > 0 && assigned >= capacity;
+}
+
+function supervisorOptionHtml(supervisor, currentSupervisorId = "") {
+  const uid = supervisor?.id;
+  if (uid == null) return "";
+  const isCurrent = String(uid) === String(currentSupervisorId || "");
+  const full = isSupervisorFull(supervisor);
+  const label = `${getSupervisorFullName(supervisor)}${full ? " (Full)" : ""}`;
+  const disabled = full && !isCurrent ? " disabled" : "";
+  return `<option value="${uid}"${disabled}>${escapeHtml(label)}</option>`;
 }
 
 function filterSupervisors() {
@@ -922,10 +1057,18 @@ function filterStudents() { renderStudents(); }
 async function loadStudents() {
   try {
     const response = await fetch(STUDENTS_API_URL, { method: "GET" });
+    console.log("🔍 DEBUG: Students API response status:", response.status);
+    console.log("🔍 DEBUG: Students API URL:", STUDENTS_API_URL);
+    console.log("🔍 DEBUG: Students API ok:", response.ok);
+    
     if (!response.ok) throw new Error(`Failed to load students (${response.status})`);
     const data = await response.json();
+    console.log("🔍 DEBUG: Students API response data:", data);
+    
     // API returns flat array of UserSerializer objects
     const students = Array.isArray(data) ? data : (Array.isArray(data.students) ? data.students : []);
+    console.log("🔍 DEBUG: Extracted students array length:", students.length);
+    
     studentsState = students.map((item) => ({
       id:          item.id,
       name:        item.name || item.display_name || "Unknown Student",
@@ -937,10 +1080,15 @@ async function loadStudents() {
       status:      item.status || "Active",
       gpa:         item.gpa || "-",
     }));
+    console.log("🔍 DEBUG: studentsState after mapping - length:", studentsState.length);
+    if (studentsState.length > 0) console.log("🔍 DEBUG: First student in state:", studentsState[0]);
   } catch (error) {
-    console.error("Error loading students:", error);
+    console.error("🔴 ERROR loading students:", error);
+    console.error("🔴 ERROR message:", error.message);
+    console.error("🔴 ERROR stack:", error.stack);
     studentsState = [];
   } finally {
+    console.log("🔍 DEBUG: Final studentsState.length before render:", studentsState.length);
     syncStudentsTeamFilter();
     renderStudents();
   }
@@ -990,6 +1138,7 @@ async function submitStudentForm(event) {
     name:   String(formData.get("name")  || "").trim(),
     email:  String(formData.get("email") || "").trim(),
     status: String(formData.get("status") || "active").trim(),
+    gpa:    String(formData.get("gpa") || "").trim(),
   };
 
   try {
@@ -1013,6 +1162,20 @@ async function submitStudentForm(event) {
     setModalError("add-student-error", error.message || "Failed to save student.");
   }
 }
+
+document.addEventListener("change", (event) => {
+
+  if (event.target.id !== "schedule-type-select") return;
+
+  const isTask = event.target.value === "task";
+
+  document.getElementById("task-fields").style.display =
+    isTask ? "block" : "none";
+
+  document.getElementById("defense-fields").style.display =
+    isTask ? "none" : "block";
+
+});
 
 function editStudent(id) {
   const student = studentsState.find((s) => String(s.id) === String(id));
@@ -1058,6 +1221,9 @@ async function deleteStudentConfirmed() {
    TEAMS SEARCH
    ============================================ */
 function getTeamSupervisorLabel(team) {
+  if (team?.assigned_supervisor?.display_name) {
+    return String(team.assigned_supervisor.display_name);
+  }
   if (!team?.supervisor_id) return "Unassigned";
   const sup = supervisorsState.find((s) => String(s?.user?.id) === String(team.supervisor_id));
   return sup ? getSupervisorFullName(sup) : `Supervisor #${team.supervisor_id}`;
@@ -1094,15 +1260,84 @@ function updateTeamToolbarStats() {
     const el = document.getElementById(id);
     if (el) el.textContent = String(v);
   };
-  const total = teamsState.length;
-  const approved = teamsState.filter((t) => String(t.status).toLowerCase() === "approved").length;
-  const pending = teamsState.filter((t) => {
-    const st = String(t.status).toLowerCase();
-    return st !== "approved" && st !== "rejected";
-  }).length;
+
+  const activeTeams = teamsState.filter((team) =>
+    !(team.is_archived === true || String(team.is_archived || "").toLowerCase() === "true")
+  );
+
+  const total = activeTeams.length;
+  const active = activeTeams.filter(
+    (t) => String(t.status).toLowerCase() === "active"
+  ).length;
+
+  const forming = activeTeams.filter(
+    (t) => String(t.status).toLowerCase() === "forming"
+  ).length;
+
   set("teams-toolbar-total", total);
-  set("teams-toolbar-approved", approved);
-  set("teams-toolbar-pending", pending);
+  set("teams-toolbar-active", active);
+  set("teams-toolbar-forming", forming);
+}
+
+async function autoCreateTeams() {
+
+  const unassignedStudents = studentsState.filter(
+    s => !s.team_id
+  );
+
+  if (unassignedStudents.length === 0) {
+    showUiFeedback("No students available.");
+    return;
+  }
+
+  const groups = [];
+
+  for (let i = 0; i < unassignedStudents.length; i += 5) {
+    groups.push(unassignedStudents.slice(i, i + 5));
+  }
+
+  let teamCounter = teamsState.length + 1;
+
+  try {
+
+    for (const group of groups) {
+
+      const payload = {
+        name: `Auto Team ${teamCounter}`,
+        project_title: "GP1",
+        project_description: "",
+        status: "forming",
+        supervisor_id: null,
+        member_ids: group.map(s => s.id)
+      };
+
+      const response = await fetch(TEAMS_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to create Auto Team ${teamCounter}`);
+      }
+
+      teamCounter++;
+    }
+
+    showUiFeedback("Teams created successfully.");
+
+    await Promise.all([
+      loadTeams(),
+      loadStudents(),
+      loadDashboardStats()
+    ]);
+
+  } catch (error) {
+    console.error(error);
+    alert(error.message);
+  }
 }
 
 function normalizeProposalTag(status) {
@@ -1123,20 +1358,28 @@ function renderTeams() {
   const tbody = document.getElementById("teams-table-body") || document.querySelector("#teams-table tbody");
   if (!tbody) return;
 
-  tbody.innerHTML = teamsState.length === 0
+  const activeTeams = teamsState.filter((team) =>
+    !(team.is_archived === true || String(team.is_archived || "").toLowerCase() === "true")
+  );
+
+  tbody.innerHTML = activeTeams.length === 0
     ? `<tr><td colspan="7" style="text-align:center;padding:32px;color:#94a3b8;">No teams found.</td></tr>`
-    : teamsState.map((team) => {
+    : activeTeams.map((team) => {
         const teamStatusClass = normalizeTeamStatus(team.status);
         const statusLabel = formatTeamStatusLabel(team.status);
         const membersCount = Number(team.members_count ?? 0);
         const st = String(team.status || "").toLowerCase();
-        const canReview = st !== "approved" && st !== "rejected";
+        const isArchived = team.is_archived === true || String(team.is_archived || "").toLowerCase() === "true";
+        const canReview = st === "forming";
         const approvalBtns = canReview
           ? `
-            <button type="button" class="btn-approve" onclick="approveTeam(${team.id})">Approve</button>
-            <button type="button" class="btn-reject" onclick="rejectTeam(${team.id})">Reject</button>
+            <button type="button" class="btn-approve" onclick="approveTeam(${team.id})">Activate</button>
+            <button type="button" class="btn-reject" onclick="rejectTeam(${team.id})">Disband</button>
           `
           : `<span style="color:#94a3b8;font-size:12px;">—</span>`;
+        const archiveBtn = st === "complete" && !isArchived
+          ? `<button type="button" class="btn-secondary" onclick="archiveTeam(${team.id})">Archive</button>`
+          : "";
         return `
           <tr>
             <td><strong>${escapeHtml(team.name || "-")}</strong></td>
@@ -1146,7 +1389,7 @@ function renderTeams() {
             <td>${escapeHtml(getTeamSupervisorLabel(team))}</td>
             <td><span class="tag ${teamStatusClass}">${escapeHtml(statusLabel)}</span></td>
             <td class="actions">
-              <div style="display:flex;gap:6px;flex-wrap:wrap;padding-bottom:6px">${approvalBtns}</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;padding-bottom:6px">${approvalBtns}${archiveBtn}</div>
               <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
                 <button type="button" class="action-btn" title="View" onclick="viewTeamQuick(${team.id})">👁</button>
                 <button type="button" class="action-btn" title="Edit" onclick="editTeam(${team.id})">✏️</button>
@@ -1176,6 +1419,7 @@ async function loadTeams() {
     teamsState = [];
   } finally {
     renderTeams();
+    renderArchive();
     syncStudentsTeamFilter();
     updateSupervisorStats();
     if (supervisorsState.length === 0) {
@@ -1183,6 +1427,115 @@ async function loadTeams() {
         renderTeams();
       });
     }
+  }
+}
+
+async function loadTeamFiles(teamId) {
+  if (!teamId) return [];
+  try {
+    const response = await fetch(`${FILES_API_URL}?team_id=${teamId}`, { method: 'GET' });
+    if (!response.ok) throw new Error(`Failed to load team files (${response.status})`);
+    const data = await response.json();
+    return Array.isArray(data) ? data : (data.files || data.results || []);
+  } catch (error) {
+    console.error("Error loading team files:", error);
+    return [];
+  }
+}
+
+function formatArchiveDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function renderArchive() {
+  const archived = teamsState.filter((team) =>
+    team.is_archived === true ||
+    String(team.is_archived || "").toLowerCase() === "true"
+  );
+
+  archivedTeamsState = archived;
+
+  const tbody = document.getElementById("archive-table-body");
+  const totalEl = document.getElementById("archive-total");
+
+  if (totalEl) {
+    totalEl.textContent = archived.length;
+  }
+
+  if (!tbody) return;
+
+  if (archived.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align:center;padding:32px;color:#94a3b8;">
+          No archived teams found.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = archived.map((team) => {
+
+    const membersCount = Array.isArray(team.members)
+      ? team.members.length
+      : Number(team.members_count || 0);
+
+    const supervisor =
+      team.assigned_supervisor?.display_name ||
+      team.assigned_supervisor?.email ||
+      getTeamSupervisorLabel(team);
+
+    const files = Array.isArray(team.files) && team.files.length > 0
+      ? team.files.map(f =>
+          `<a href="${f.file_url}" download="${escapeHtml(f.file_name)}" style="display:block;color:#2563eb;text-decoration:underline;font-size:13px;margin-bottom:2px;">📄 ${escapeHtml(f.file_name)}</a>`
+        ).join("")
+      : `<span style="color:#94a3b8;font-size:13px;">No Files</span>`;
+
+    return `
+      <tr>
+        <td><strong>${escapeHtml(team.name || "-")}</strong></td>
+        <td>👥 ${membersCount}</td>
+        <td>${escapeHtml(team.project_title || "-")}</td>
+        <td>${escapeHtml(supervisor || "Unassigned")}</td>
+        <td>${formatArchiveDate(team.archive_date)}</td>
+        <td>${files}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+async function loadArchive() {
+  await loadTeams();
+  const archived = teamsState.filter((team) =>
+    team.is_archived === true || String(team.is_archived || "").toLowerCase() === "true"
+  );
+  await Promise.all(
+    archived.map(async (team) => {
+      team.files = await loadTeamFiles(team.id);
+    })
+  );
+  renderArchive();
+}
+
+async function archiveTeam(id) {
+  if (!id) return;
+  try {
+    const response = await fetch(`${TEAMS_API_URL}${id}/archive/`, { method: 'POST' });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      const message = (data && data.error) ? data.error : `Failed to archive team (${response.status})`;
+      throw new Error(message);
+    }
+    showUiFeedback(data?.message || "Team archived successfully.");
+  } catch (error) {
+    console.error("Error archiving team:", error);
+    showUiFeedback(error.message || "Failed to archive team.");
+  } finally {
+    await loadArchive();
   }
 }
 
@@ -1212,7 +1565,7 @@ async function deleteTeam(id) {
     console.error("[Teams] Delete team failed", { id, error });
     showUiFeedback(error.message || "Failed to delete team.");
   } finally {
-    await Promise.all([loadTeams(), loadDashboardStats()]);
+    await Promise.all([loadTeams(), loadSupervisors(), loadDashboardStats()]);
   }
 }
 
@@ -1251,18 +1604,21 @@ async function openEditTeamModal(team) {
   if (!Array.isArray(supervisorsState) || supervisorsState.length === 0) {
     await loadSupervisors();
   }
+  if (!Array.isArray(studentsState) || studentsState.length === 0) {
+    await loadStudents();
+  }
 
   const supervisorSelect = document.getElementById("edit-team-supervisor-select");
   if (supervisorSelect) {
+    const currentSupervisorId = team.supervisor_id != null ? String(team.supervisor_id) : "";
     const options = supervisorsState.map((s) => {
-      const uid = s?.user?.id;
-      if (uid == null) return "";
-      const label = getSupervisorFullName(s);
-      return `<option value="${uid}">${escapeHtml(label)}</option>`;
+      return supervisorOptionHtml(s, currentSupervisorId);
     });
     supervisorSelect.innerHTML = [`<option value="">Unassigned</option>`, ...options.filter(Boolean)].join("");
   }
 
+  const memberIds = Array.isArray(team.members) ? team.members.map((m) => m.id) : [];
+  renderTeamMembersList('edit-team-members-list', memberIds);
   fillTeamEditForm(team);
   openModal("edit-team-modal");
 }
@@ -1284,12 +1640,20 @@ async function submitEditTeamForm(event) {
   const form = event.currentTarget;
   const formData = new FormData(form);
   const supervisorRaw = String(formData.get("supervisor_id") || "").trim();
+  const selectedMemberIds = getSelectedTeamMemberIds("edit-team-members-list");
+
+  if (selectedMemberIds.length > TEAM_MAX_MEMBERS) {
+    setTeamMembersError("edit-team-members-error", `Maximum team size is ${TEAM_MAX_MEMBERS} students.`);
+    return;
+  }
+
   const payload = {
     name: String(formData.get("name") || "").trim(),
     project_title: String(formData.get("project_title") || "").trim(),
     supervisor_id: supervisorRaw ? Number(supervisorRaw) : null,
     status: String(formData.get("status") || "").trim(),
     proposal_status: String(formData.get("proposal_status") || "").trim(),
+    member_ids: selectedMemberIds,
   };
 
   const url = `${TEAMS_API_URL}${teamModalEditingId}/`;
@@ -1308,7 +1672,7 @@ async function submitEditTeamForm(event) {
     closeModal("edit-team-modal");
     teamModalEditingId = null;
     showUiFeedback(data.message || "Team updated successfully.");
-    await Promise.all([loadTeams(), loadDashboardStats()]);
+    await Promise.all([loadTeams(), loadSupervisors(), loadDashboardStats()]);
   } catch (error) {
     console.error("[Teams] Edit team failed", { id: teamModalEditingId, error });
     setModalError("edit-team-error", error.message || "Failed to update team.");
@@ -1323,7 +1687,7 @@ async function approveTeam(id) {
       throw new Error(getJsonErrorMessage(data, `Failed to approve team (${response.status})`));
     }
     showUiFeedback(data.message || "Team approved successfully.");
-    await Promise.all([loadTeams(), loadDashboardStats()]);
+    await Promise.all([loadTeams(), loadSupervisors(), loadDashboardStats()]);
   } catch (error) {
     console.error("[Teams] Approve failed", error);
     showUiFeedback(error.message || "Failed to approve team.");
@@ -1338,7 +1702,7 @@ async function rejectTeam(id) {
       throw new Error(getJsonErrorMessage(data, `Failed to reject team (${response.status})`));
     }
     showUiFeedback(data.message || "Team rejected successfully.");
-    await Promise.all([loadTeams(), loadDashboardStats()]);
+    await Promise.all([loadTeams(), loadSupervisors(), loadDashboardStats()]);
   } catch (error) {
     console.error("[Teams] Reject failed", error);
     showUiFeedback(error.message || "Failed to reject team.");
@@ -1384,15 +1748,17 @@ function renderDefense() {
   }
 
   list.innerHTML = defenseState.map(d => {
-    const teamName = d.team_name || `Team #${d.team_id}`;
-    const room     = d.location  || "—";
+    const teamName   = d.team_name  || `Team #${d.team_id}`;
+    const room       = d.location   || "—";
     const supervisor = d.supervisor || "—";
+    const ex1        = d.examiner1_name || "—";
+    const ex2        = d.examiner2_name || "—";
     return `
       <div class="defense-card">
         <div class="defense-icon">📅</div>
         <div class="defense-body">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px">
-            <div class="defense-title">${escapeHtml(teamName)}</div>
+            <div class="defense-title">🎓 Defense Meeting</div>
             <span class="tag amber">Scheduled</span>
           </div>
           <div class="defense-meta">
@@ -1400,11 +1766,14 @@ function renderDefense() {
             <span>📍 ${escapeHtml(room)}</span>
           </div>
           <div class="defense-tags">
+            <span class="defense-sup">Team: ${escapeHtml(teamName)}</span>
             <span class="defense-sup">Supervisor: ${escapeHtml(supervisor)}</span>
-          </div>
+            <span class="defense-sup">Examiner 1: ${escapeHtml(ex1)}</span>
+            <span class="defense-sup">Examiner 2: ${escapeHtml(ex2)}</span>
+         </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px">
-          <button class="defense-edit" onclick="openEditDefense(${d.id},'${escapeHtml(d.date)}','${escapeHtml(d.time||'')}','${escapeHtml(room)}')">✏ Edit</button>
+          <button class="defense-edit" onclick="openEditDefense(${d.id},'${escapeHtml(d.date)}','${escapeHtml(d.time||'')}','${escapeHtml(room)}',${d.examiner1_id||'null'},${d.examiner2_id||'null'})">✏ Edit</button>
           <button class="defense-edit" style="background:#fee2e2;color:#dc2626" onclick="deleteDefense(${d.id})">🗑 Delete</button>
         </div>
       </div>
@@ -1412,11 +1781,15 @@ function renderDefense() {
   }).join("");
 }
 
-function openEditDefense(id, date, time, location) {
-  document.getElementById('edit-defense-id').value   = id;
-  document.getElementById('edit-defense-date').value = date;
-  document.getElementById('edit-defense-time').value = (time || '').slice(0, 5);
+function openEditDefense(id, date, time, location, ex1Id, ex2Id) {
+  document.getElementById('edit-defense-id').value       = id;
+  document.getElementById('edit-defense-date').value     = date;
+  document.getElementById('edit-defense-time').value     = (time || '').slice(0, 5);
   document.getElementById('edit-defense-location').value = location === '—' ? '' : location;
+  const ex1Sel = document.getElementById('edit-examiner1-select');
+  const ex2Sel = document.getElementById('edit-examiner2-select');
+  if (ex1Sel) ex1Sel.value = ex1Id || '';
+  if (ex2Sel) ex2Sel.value = ex2Id || '';
   setModalError('edit-defense-error', '');
   openModal('edit-defense-modal');
 }
@@ -1591,6 +1964,8 @@ function setModalError(errorId, message) {
 
 function getJsonErrorMessage(data, fallback) {
   if (data && typeof data.message === "string" && data.message.trim()) return data.message;
+  if (data && typeof data.error === "string" && data.error.trim()) return data.error;
+  if (data && typeof data.detail === "string" && data.detail.trim()) return data.detail;
   return fallback;
 }
 
@@ -1601,12 +1976,20 @@ async function submitAddTeamForm(event) {
   const form     = event.currentTarget;
   const formData = new FormData(form);
   const supRaw   = formData.get("supervisor_id");
+  const selectedMemberIds = getSelectedTeamMemberIds("add-team-members-list");
+
+  if (selectedMemberIds.length > TEAM_MAX_MEMBERS) {
+    setTeamMembersError("add-team-members-error", `Maximum team size is ${TEAM_MAX_MEMBERS} students.`);
+    return;
+  }
+
   const payload  = {
     name:                formData.get("name"),
     project_title:       formData.get("project_title") || formData.get("name"),
     project_description: formData.get("project_description") || "",
     status:              formData.get("status") || "forming",
     supervisor_id:       supRaw ? parseInt(supRaw) : null,
+    member_ids:          selectedMemberIds,
   };
 
   try {
@@ -1622,7 +2005,7 @@ async function submitAddTeamForm(event) {
     closeModal("add-team-modal");
     form.reset();
     showUiFeedback("Team created successfully.");
-    await Promise.all([loadTeams(), loadDashboardStats()]);
+    await Promise.all([loadTeams(), loadSupervisors(), loadDashboardStats()]);
   } catch (error) {
     setModalError("add-team-error", error.message);
   }
@@ -1635,14 +2018,14 @@ async function submitAddStudentForm(event) {
   const form = event.currentTarget;
   const formData = new FormData(form);
   const payload = {
-    name: formData.get("name"),
-    email: formData.get("email"),
-    team_id: parseInt(formData.get("team_id")),
+  name: formData.get("name"),
+  email: formData.get("email"),
+  gpa: formData.get("gpa"),
   };
 
   try {
     const token = localStorage.getItem('access');
-    const response = await fetch(TEAMS_API_URL, {
+    const response = await fetch(STUDENTS_API_URL, {
     method: "POST",
     headers: { 
         "Content-Type": "application/json",
@@ -1745,11 +2128,19 @@ async function submitScheduleDefenseForm(event) {
 
   const form = event.currentTarget;
   const formData = new FormData(form);
+  const ex1Val = formData.get("examiner1_id");
+  const ex2Val = formData.get("examiner2_id");
   const payload = {
-    team_id: Number(formData.get("team_id")),
-    date: String(formData.get("date") || "").trim(),
-    time: String(formData.get("time") || "").trim(),
-    location: String(formData.get("location") || "").trim(),
+    schedule_type:    String(formData.get("schedule_type") || "defense"),
+    team_id:          Number(formData.get("team_id")),
+    date:             String(formData.get("date") || "").trim(),
+    time:             String(formData.get("time") || "").trim(),
+    location:         String(formData.get("location") || "").trim(),
+    examiner1_id:     ex1Val ? Number(ex1Val) : null,
+    examiner2_id:     ex2Val ? Number(ex2Val) : null,
+    task_title:       String(formData.get("task_title") || "").trim(),
+    task_description: String(formData.get("task_description") || "").trim(),
+    task_deadline:    String(formData.get("task_deadline") || "").trim(),
   };
   console.log("[Defense] Sending create request", payload);
 
@@ -1822,13 +2213,20 @@ function bindHeaderActionButtons() {
   const confirmDeleteProposalBtn = document.getElementById("btn-confirm-delete-proposal");
   const confirmDeleteGradeBtn = document.getElementById("btn-confirm-delete-grade");
 
-  if (teamBtn) teamBtn.addEventListener("click", () => {
-    // Populate supervisor dropdown
+  if (teamBtn) teamBtn.addEventListener("click", async () => {
+    if (!Array.isArray(supervisorsState) || supervisorsState.length === 0) {
+      await loadSupervisors();
+    }
+    if (!Array.isArray(studentsState) || studentsState.length === 0) {
+      await loadStudents();
+    }
+
     const sel = document.getElementById('add-team-supervisor-select');
     if (sel && supervisorsState.length) {
       sel.innerHTML = '<option value="">— None —</option>' +
-        supervisorsState.map(s => `<option value="${s.id}">${escapeHtml(getSupervisorFullName(s))}</option>`).join('');
+        supervisorsState.map(s => supervisorOptionHtml(s)).join('');
     }
+    renderTeamMembersList('add-team-members-list', []);
     openModal("add-team-modal");
   });
   if (supervisorBtn) supervisorBtn.addEventListener("click", () => openSupervisorModal());
@@ -1858,11 +2256,17 @@ function bindHeaderActionButtons() {
     const date     = document.getElementById('edit-defense-date').value;
     const time     = document.getElementById('edit-defense-time').value;
     const location = document.getElementById('edit-defense-location').value.trim() || 'TBD';
+    const ex1Val   = document.getElementById('edit-examiner1-select')?.value;
+    const ex2Val   = document.getElementById('edit-examiner2-select')?.value;
     try {
       const res  = await fetch(`${API_BASE_URL}/api/defense/${id}/`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, time, location }),
+        body: JSON.stringify({
+          date, time, location,
+          examiner1_id: ex1Val ? Number(ex1Val) : null,
+          examiner2_id: ex2Val ? Number(ex2Val) : null,
+        }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) throw new Error(data?.message || `Failed (${res.status})`);
@@ -1907,10 +2311,11 @@ function renderGrades() {
     : rows.map(g => {
         const statusLabel = normalizeGradeStatus(g.status);
         const statusTag = {
-          Approved: `<span class="tag green">Approved</span>`,
-          Submitted: `<span class="tag amber">Submitted</span>`,
-          Draft: `<span class="tag gray">Draft</span>`,
-          Rejected: `<span class="tag red">Rejected</span>`,
+          Approved:   `<span class="tag green">Approved</span>`,
+          Submitted:  `<span class="tag amber">Submitted</span>`,
+          Incomplete: `<span class="tag orange">Incomplete</span>`,
+          Draft:      `<span class="tag gray">Draft</span>`,
+          Rejected:   `<span class="tag red">Rejected</span>`,
         }[statusLabel] || `<span class="tag gray">${g.status || "Unknown"}</span>`;
 
         const actionBtns = g.id && (statusLabel === "Draft" || statusLabel === "Submitted")
@@ -1962,19 +2367,20 @@ function renderGrades() {
 
 function normalizeGradeStatus(status) {
   const statusMap = {
-    approved: "Approved",
-    submitted: "Submitted",
-    draft: "Draft",
-    rejected: "Rejected",
+    approved:   "Approved",
+    submitted:  "Submitted",
+    pending:    "Incomplete",
+    draft:      "Draft",
+    rejected:   "Rejected",
   };
   return statusMap[String(status || "").toLowerCase()] || "Draft";
 }
 
 function getGradeClass(grade) {
-  if (grade >= 90) return "grade-a";
-  if (grade >= 80) return "grade-b";
-  if (grade >= 70) return "grade-c";
-  if (grade >= 60) return "grade-d";
+  if (grade >= 80) return "grade-a";
+  if (grade >= 70) return "grade-b";
+  if (grade >= 60) return "grade-c";
+  if (grade >= 50) return "grade-d";
   return "grade-f";
 }
 
@@ -2020,17 +2426,17 @@ function updateGradePreview() {
   if (!isNaN(supervisorGrade) && !isNaN(committee1Grade) && !isNaN(committee2Grade)) {
     const finalGrade = (supervisorGrade * 0.5) + (committee1Grade * 0.25) + (committee2Grade * 0.25);
     let letterGrade = '';
-    if (finalGrade >= 97) letterGrade = 'A+';
-    else if (finalGrade >= 93) letterGrade = 'A';
-    else if (finalGrade >= 90) letterGrade = 'A-';
-    else if (finalGrade >= 87) letterGrade = 'B+';
-    else if (finalGrade >= 83) letterGrade = 'B';
-    else if (finalGrade >= 80) letterGrade = 'B-';
-    else if (finalGrade >= 77) letterGrade = 'C+';
-    else if (finalGrade >= 73) letterGrade = 'C';
-    else if (finalGrade >= 70) letterGrade = 'C-';
-    else if (finalGrade >= 67) letterGrade = 'D+';
-    else if (finalGrade >= 60) letterGrade = 'D';
+    if (finalGrade >= 95) letterGrade = 'A+';
+    else if (finalGrade >= 85) letterGrade = 'A';
+    else if (finalGrade >= 80) letterGrade = 'A-';
+    else if (finalGrade >= 77) letterGrade = 'B+';
+    else if (finalGrade >= 73) letterGrade = 'B';
+    else if (finalGrade >= 70) letterGrade = 'B-';
+    else if (finalGrade >= 67) letterGrade = 'C+';
+    else if (finalGrade >= 63) letterGrade = 'C';
+    else if (finalGrade >= 60) letterGrade = 'C-';
+    else if (finalGrade >= 57) letterGrade = 'D+';
+    else if (finalGrade >= 50) letterGrade = 'D';
     else letterGrade = 'F';
     
     document.getElementById("preview-final-grade").textContent = finalGrade.toFixed(2);
@@ -2290,6 +2696,7 @@ window.approveProposal = approveProposal;
 window.rejectProposal = rejectProposal;
 window.editTeam = editTeam;
 window.deleteTeam = deleteTeam;
+window.archiveTeam = archiveTeam;
 window.approveTeam = approveTeam;
 window.rejectTeam = rejectTeam;
 window.editStudent = editStudent;

@@ -73,7 +73,7 @@
       }
 
       /* Profile block — row with avatar image + name/role column */
-      .sv-profile { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; cursor: pointer; }
+      .sv-profile { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
 
       /* Circular avatar thumbnail */
       .sv-profile img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,.2); }
@@ -234,14 +234,12 @@
     //   - Notifications link additionally gets the #nav-unread-badge <span> for the red count pill
     //   - #btn-logout: the logout anchor at the bottom of the nav
     root.innerHTML = `
-      <div class="sv-profile" id="sv-profile-click" title="Click to change avatar">
+      <div class="sv-profile">
         <img src="${avatarSrc}" alt="avatar" id="sv-avatar" />
         <div>
           <div class="sv-name">${displayName}</div>
           <div class="sv-role">Supervisor</div>
         </div>
-        <!-- Hidden file input triggered by clicking the profile block above -->
-        <input type="file" id="sv-image-input" hidden accept="image/*" />
       </div>
 
       <nav class="side-nav">
@@ -261,29 +259,6 @@
         </a>
       </nav>
     `;
-
-    // ── Step 4 — Avatar upload ─────────────────────────────────────────────────
-    // Clicking anywhere on the profile block (.sv-profile) opens the hidden file picker
-    document.getElementById('sv-profile-click').onclick = () =>
-      document.getElementById('sv-image-input').click();
-
-    // When the user picks an image file:
-    document.getElementById('sv-image-input').onchange = function (e) {
-      const file = e.target.files[0];
-      if (!file) return; // dialog cancelled — nothing to do
-
-      // Read the selected image as a Base64 data URL using the FileReader API
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        // Persist the image in localStorage, keyed by the user's email address,
-        // so it survives page refreshes and navigation between supervisor pages.
-        localStorage.setItem('profileImg_' + user.email, ev.target.result);
-
-        // Update the visible avatar <img> immediately without a page reload
-        document.getElementById('sv-avatar').src = ev.target.result;
-      };
-      reader.readAsDataURL(file); // triggers reader.onload with the data URL
-    };
 
     // ── Step 5 — Logout ────────────────────────────────────────────────────────
     // Clicking the Logout link calls GPApi.logout() which:

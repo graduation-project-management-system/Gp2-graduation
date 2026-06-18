@@ -68,14 +68,21 @@ def create_defense_api(request):
     if error_response:
         return error_response
 
+    schedule_type = payload.get('schedule_type', 'defense')
+
     team_id = payload.get('team_id')
     scheduled_date = payload.get('date')
     scheduled_time = payload.get('time')
     location = (payload.get('location') or '').strip()
 
-    if not team_id or not scheduled_date or not scheduled_time or not location:
+    task_title = (payload.get('task_title') or '').strip()
+    task_description = (payload.get('task_description') or '').strip()
+    task_deadline = payload.get('task_deadline')
+
+    if schedule_type == 'defense':
+     if not team_id or not scheduled_date or not scheduled_time:
         return JsonResponse(
-            {'success': False, 'message': 'team_id, date, time, and location are required.'},
+            {'success': False, 'message': 'team_id, date and time are required.'},
             status=400,
         )
 

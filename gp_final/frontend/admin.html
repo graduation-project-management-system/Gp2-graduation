@@ -28,6 +28,9 @@
       <a class="nav-item" onclick="showSection('teams', this)">
         <span class="nav-icon">👥</span> Teams
       </a>
+      <a class="nav-item" onclick="showSection('archive', this)">
+        <span class="nav-icon">🗄️</span> Archive
+      </a>
       <a class="nav-item" onclick="showSection('proposals', this)">
         <span class="nav-icon">📁</span> Project Proposals
       </a>
@@ -49,9 +52,7 @@
     </nav>
 
     <div class="sidebar-footer">
-      <button class="notif-btn" onclick="alert('3 pending actions require your attention.')">
-        <span>🔔</span> Notifications
-        <span class="badge">3</span>
+      
       </button>
       <button class="logout-btn" onclick="if(confirm('Logout?')) { localStorage.clear(); location.href='/login.html'; }">
         <span>🚪</span> Log out
@@ -233,7 +234,11 @@
           <h2>Teams Management</h2>
           <p>View and manage all graduation project teams</p>
         </div>
-        <button class="btn-primary" id="btn-open-add-team">+ Add Team</button>
+        <div style="display:flex;gap:10px;">
+            <button class="btn-secondary" onclick="autoCreateTeams()">Auto Create Teams</button>
+            <button class="btn-primary" id="btn-open-add-team">+ Add Team</button>
+        </div>
+
       </div>
 
       <div class="card">
@@ -243,11 +248,10 @@
             <input type="text" id="teams-search" placeholder="Search team, project, supervisor..." oninput="filterTeams()" />
           </div>
           <div class="tag-row">
-            <span class="tag gray">Total: <span id="teams-toolbar-total">0</span></span>
-            <span class="tag green">Approved: <span id="teams-toolbar-approved">0</span></span>
-            <span class="tag amber">Pending review: <span id="teams-toolbar-pending">0</span></span>
-          </div>
-        </div>
+              <span class="tag gray">Total: <span id="teams-toolbar-total">0</span></span>
+              <span class="tag green">Active: <span id="teams-toolbar-active">0</span></span>
+              <span class="tag amber">Forming: <span id="teams-toolbar-forming">0</span></span>
+             </div>
 
         <table class="data-table" id="teams-table">
           <thead>
@@ -268,6 +272,59 @@
       </div>
 
     </section>
+
+    <!-- ===== ARCHIVE ===== -->
+   <section id="archive" class="section">
+
+  <div class="page-header">
+    <div>
+      <h2>Archive</h2>
+      <p>Review archived teams and their project artifacts.</p>
+    </div>
+  </div>
+
+  <div class="card">
+
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input
+          type="text"
+          id="archive-search"
+          placeholder="Search archived teams..."
+          oninput="filterArchive()"
+        />
+      </div>
+
+      <div class="tag-row">
+        <span class="tag gray">
+          Total Archived:
+          <span id="archive-total">0</span>
+        </span>
+      </div>
+    </div>
+
+    <table class="data-table" id="archive-table">
+      <thead>
+        <tr>
+          <th>Team Name</th>
+          <th>Members</th>
+          <th>Project</th>
+          <th>Supervisor</th>
+          <th>Archive Date</th>
+          <th>Files</th>
+        </tr>
+      </thead>
+
+      <tbody id="archive-table-body">
+        <!-- Filled by JavaScript -->
+      </tbody>
+
+    </table>
+
+  </div>
+
+</section>
 
     <!-- ===== PROPOSALS ===== -->
     <section id="proposals" class="section">
@@ -422,7 +479,7 @@
           <thead>
             <tr>
               <th>Student Name</th>
-              <th>ID</th>
+              <th>Email</th>
               <th>Team</th>
               <th>Supervisor</th>
               <th>Status</th>
@@ -581,8 +638,12 @@
         <div class="modal-error" id="add-team-error"></div>
         <label>Team Name</label>
         <input type="text" name="name" required placeholder="e.g. AI Software Team" />
-        <label>Project Title</label>
-        <input type="text" name="project_title" required placeholder="e.g. AI Medical Diagnosis System" />
+        <label>Project Type</label>
+        <select name="project_title" required>
+          <option value="">Select GP Type</option>
+          <option value="GP1">GP1</option>
+          <option value="GP2">GP2</option>
+        </select>
         <label>Assign Supervisor</label>
         <select name="supervisor_id" id="add-team-supervisor-select">
           <option value="">— None —</option>
@@ -593,6 +654,18 @@
           <option value="active">Active</option>
           <option value="complete">Complete</option>
         </select>
+
+        <label>Team Members</label>
+        <div class="team-members-field">
+          <div class="team-members-list" id="add-team-members-list">
+            <!-- filled by JS: student rows with checkboxes -->
+          </div>
+          <div class="form-note" id="add-team-members-note">
+            Select up to 5 students.
+          </div>
+          <div class="modal-error" id="add-team-members-error"></div>
+        </div>
+
         <div class="modal-actions">
           <button class="btn-secondary" type="button" data-modal-close="add-team-modal">Cancel</button>
           <button class="btn-primary" type="submit">Create Team</button>
@@ -611,8 +684,11 @@
         <div class="modal-error" id="edit-team-error"></div>
         <label>Team Name</label>
         <input type="text" name="name" required placeholder="e.g. AI Software Team" />
-        <label>Project Title</label>
-        <input type="text" name="project_title" required placeholder="e.g. AI Medical Diagnosis System" />
+        <label>Project Type</label>
+        <select name="project_title" required>
+           <option value="GP1">GP1</option>
+           <option value="GP2">GP2</option>
+        </select>
         <label>Supervisor</label>
         <select name="supervisor_id" id="edit-team-supervisor-select">
           <option value="">Unassigned</option>
@@ -621,9 +697,7 @@
         <select name="status" required>
           <option value="forming">Forming</option>
           <option value="active">Active</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-          <option value="completed">Completed</option>
+          <option value="complete">Completed</option>
           <option value="disbanded">Disbanded</option>
         </select>
         <label>Proposal Status</label>
@@ -635,6 +709,18 @@
           <option value="accepted">Accepted</option>
           <option value="rejected">Rejected</option>
         </select>
+
+        <label>Team Members</label>
+        <div class="team-members-field">
+          <div class="team-members-list" id="edit-team-members-list">
+            <!-- filled by JS: student rows with checkboxes -->
+          </div>
+          <div class="form-note" id="edit-team-members-note">
+            Select up to 5 students.
+          </div>
+          <div class="modal-error" id="edit-team-members-error"></div>
+        </div>
+
         <div class="modal-actions">
           <button class="btn-secondary" type="button" data-modal-close="edit-team-modal">Cancel</button>
           <button class="btn-primary" type="submit">Save Changes</button>
@@ -698,22 +784,89 @@
         <button class="modal-close-btn" type="button" data-modal-close="schedule-defense-modal">✕</button>
       </div>
       <form id="schedule-defense-form" class="modal-form">
-        <div class="modal-error" id="schedule-defense-error"></div>
-        <label>Team</label>
-        <select name="team_id" id="defense-team-select" required>
-          <option value="" disabled selected>Choose a team…</option>
-        </select>
-        <label>Date</label>
-        <input type="date" name="date" required />
-        <label>Time</label>
-        <input type="time" name="time" required />
-        <label>Location / Room</label>
-        <input type="text" name="location" placeholder="e.g. Hall A - 201" />
-        <div class="modal-actions">
-          <button class="btn-secondary" type="button" data-modal-close="schedule-defense-modal">Cancel</button>
-          <button class="btn-primary" type="submit">Schedule</button>
-        </div>
-      </form>
+
+  <div class="modal-error" id="schedule-defense-error"></div>
+
+  <label>Schedule Type</label>
+  <select name="schedule_type" id="schedule-type-select" required>
+    <option value="defense" selected>Defense Meeting</option>
+    <option value="task">Task / Announcement</option>
+  </select>
+
+  <div id="defense-fields">
+
+    <label>Team</label>
+    <select name="team_id" id="defense-team-select">
+      <option value="" disabled selected>Choose a team...</option>
+    </select>
+
+    <label>Date</label>
+    <input type="date" name="date" />
+
+    <label>Time</label>
+    <input type="time" name="time" />
+
+    <label>Meeting Mode</label>
+    <select name="meeting_mode">
+      <option value="online">Online</option>
+      <option value="onsite">On Site</option>
+    </select>
+
+    <label>Location / Room</label>
+    <input
+      type="text"
+      name="location"
+      placeholder="e.g. Hall A-201"
+    />
+
+    <label>Examiner 1</label>
+    <select name="examiner1_id" id="schedule-examiner1-select">
+      <option value="">— None —</option>
+    </select>
+
+    <label>Examiner 2</label>
+    <select name="examiner2_id" id="schedule-examiner2-select">
+      <option value="">— None —</option>
+    </select>
+
+  </div>
+
+  <div id="task-fields" style="display:none;">
+
+    <label>Task Title</label>
+    <input
+      type="text"
+      name="task_title"
+      placeholder="e.g. Submit Final Report"
+    />
+
+    <label>Task Description</label>
+    <textarea
+      name="task_description"
+      rows="4"
+      placeholder="Enter task details..."
+    ></textarea>
+
+    <label>Deadline</label>
+    <input type="date" name="task_deadline" />
+
+  </div>
+
+  <div class="modal-actions">
+    <button
+      class="btn-secondary"
+      type="button"
+      data-modal-close="schedule-defense-modal"
+    >
+      Cancel
+    </button>
+
+    <button class="btn-primary" type="submit">
+      Save
+    </button>
+  </div>
+
+</form>
     </div>
   </div>
 
@@ -725,19 +878,38 @@
         <button class="modal-close-btn" type="button" data-modal-close="edit-defense-modal">✕</button>
       </div>
       <form id="edit-defense-form" class="modal-form">
-        <div class="modal-error" id="edit-defense-error"></div>
-        <input type="hidden" id="edit-defense-id" />
-        <label>Date</label>
-        <input type="date" name="date" id="edit-defense-date" required />
-        <label>Time</label>
-        <input type="time" name="time" id="edit-defense-time" required />
-        <label>Location / Room</label>
-        <input type="text" name="location" id="edit-defense-location" placeholder="e.g. Room 201" />
-        <div class="modal-actions">
-          <button class="btn-secondary" type="button" data-modal-close="edit-defense-modal">Cancel</button>
-          <button class="btn-primary" type="submit">Save Changes</button>
-        </div>
-      </form>
+  <div class="modal-error" id="edit-defense-error"></div>
+  <input type="hidden" id="edit-defense-id" />
+
+    <label>Date</label>
+    <input type="date" id="edit-defense-date" required />
+
+    <label>Time</label>
+    <input type="time" id="edit-defense-time" required />
+
+    <label>Location / Room</label>
+    <input type="text" id="edit-defense-location" placeholder="e.g. Hall A - 201" />
+
+    <label>Examiner 1</label>
+    <select id="edit-examiner1-select">
+      <option value="">— None —</option>
+    </select>
+
+    <label>Examiner 2</label>
+    <select id="edit-examiner2-select">
+      <option value="">— None —</option>
+    </select>
+
+  <div class="modal-actions">
+    <button class="btn-secondary" type="button" data-modal-close="edit-defense-modal">
+      Cancel
+    </button>
+
+    <button class="btn-primary" type="submit">
+      Save Changes
+    </button>
+  </div>
+</form>
     </div>
   </div>
 
@@ -750,9 +922,9 @@
       <form id="add-proposal-form" class="modal-form" enctype="multipart/form-data">
         <div class="modal-error" id="add-proposal-error"></div>
         <label>Team</label>
-        <select name="team_id" id="proposal-team-select" required>
-          <option value="" disabled selected>Choose a team...</option>
-        </select>
+       <select name="team_id" id="proposal-team-select">
+         <option value="" selected>No Team Assigned</option>
+       </select>
         <label>Project Title</label>
         <input type="text" name="title" required placeholder="e.g. AI Medical Diagnosis System" />
         <label>Supervisor</label>
@@ -809,6 +981,9 @@
 
         <label>Email Address</label>
         <input type="email" name="email" required placeholder="e.g. ali@cit.just.edu.jo" />
+
+        <label>GPA</label>
+        <input type="number" name="gpa" step="0.01" min="0" max="4" placeholder="e.g. 3.25" />
 
         <label>Status</label>
         <select name="status" required>
@@ -933,6 +1108,6 @@
     location.href = '/login.html';
   }
   </script>
-  <script src="/static/admin.js"></script>
+  <script src="/static/admin.js?v=3"></script>
 </body>
 </html>

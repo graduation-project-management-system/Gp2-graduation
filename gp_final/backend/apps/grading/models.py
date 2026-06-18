@@ -33,14 +33,16 @@ class GradingReport(models.Model):
     examiner_one_grade = models.DecimalField(
         max_digits=5, decimal_places=2,
         validators=[MinValueValidator(0), MaxValueValidator(100)],
+        null=True, blank=True,
     )
     examiner_two_grade = models.DecimalField(
         max_digits=5, decimal_places=2,
         validators=[MinValueValidator(0), MaxValueValidator(100)],
+        null=True, blank=True,
     )
 
-    # Computed (stored for fast lookup)
-    final_grade        = models.DecimalField(max_digits=5, decimal_places=2, editable=False)
+    # Computed (stored for fast lookup); null until all three grades are in
+    final_grade        = models.DecimalField(max_digits=5, decimal_places=2, editable=False, null=True, blank=True)
 
     feedback           = models.TextField(blank=True)
     archived_file      = models.FileField(upload_to='grading_archives/', null=True, blank=True)
@@ -53,16 +55,19 @@ class GradingReport(models.Model):
         unique_together = ('team', 'phase')
 
     def save(self, *args, **kwargs):
-        weights = getattr(settings, 'GRADING_WEIGHTS', {
-            'chief_supervisor': 0.50,
-            'examiner_one':     0.25,
-            'examiner_two':     0.25,
-        })
-        self.final_grade = (
-            float(self.chief_grade)        * weights['chief_supervisor'] +
-            float(self.examiner_one_grade) * weights['examiner_one'] +
-            float(self.examiner_two_grade) * weights['examiner_two']
-        )
+        if self.examiner_one_grade is not None and self.examiner_two_grade is not None:
+            weights = getattr(settings, 'GRADING_WEIGHTS', {
+                'chief_supervisor': 0.50,
+                'examiner_one':     0.25,
+                'examiner_two':     0.25,
+            })
+            self.final_grade = (
+                float(self.chief_grade)        * weights['chief_supervisor'] +
+                float(self.examiner_one_grade) * weights['examiner_one'] +
+                float(self.examiner_two_grade) * weights['examiner_two']
+            )
+        else:
+            self.final_grade = None
         super().save(*args, **kwargs)
 
     def __str__(self):

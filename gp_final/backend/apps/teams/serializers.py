@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import Team, ExamDate, MembershipRequest
+from apps.accounts.models import UserRole
+from .models import Team, ExamDate, MembershipRequest, TeamStatus
 
 User = get_user_model()
 
@@ -39,6 +40,7 @@ class TeamSerializer(serializers.ModelSerializer):
             'status', 'leader', 'members', 'members_info', 'assigned_supervisor',
             'supervisor', 'members_count',
             'progress', 'academic_year', 'exam_dates',
+            'is_archived', 'archive_date',
             'created_at', 'updated_at',
         ]
 
@@ -46,27 +48,143 @@ class TeamSerializer(serializers.ModelSerializer):
 class TeamCreateSerializer(serializers.ModelSerializer):
     project_title       = serializers.CharField(required=False, allow_blank=True, default='')
     project_description = serializers.CharField(required=False, allow_blank=True, default='')
+    status              = serializers.ChoiceField(
+        choices=TeamStatus.choices,
+        required=False,
+        default='forming'
+    )
+    member_ids          = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
 
     class Meta:
         model  = Team
-        fields = ['name', 'project_title', 'project_description', 'academic_year']
+        fields = ['name', 'project_title', 'project_description', 'academic_year', 'status', 'member_ids']
+
+    def validate_name(self, value):
+        """Check for duplicate team names."""
+        if Team.objects.filter(name=value).exists():
+            raise serializers.ValidationError('A team with this name already exists.')
+        return value
+
+    def validate_member_ids(self, value):
+        """Validate member_ids: max 5, no duplicates, all students."""
+        if not value:
+            return value
+
+        # Check max 5 members
+        if len(value) > 5:
+            raise serializers.ValidationError('Maximum 5 members allowed.')
+
+        # Check for duplicates
+        if len(value) != len(set(value)):
+            raise serializers.ValidationError('Duplicate member IDs.')
+
+        # Check all exist and are students
+        User = get_user_model()
+        members = User.objects.filter(pk__in=value)
+        if members.count() != len(value):
+            raise serializers.ValidationError('One or more member IDs do not exist.')
+
+        for member in members:
+            if member.role != UserRole.STUDENT:
+                raise serializers.ValidationError(f'User {member.id} is not a student.')
+
+        # NEW: Check that no member is already in any team
+        for member in members:
+            existing_team = Team.objects.filter(members=member).first()
+            if existing_team:
+                raise serializers.ValidationError(
+                    f'Student {member.display_name} is already a member of team "{existing_team.name}".'
+                )
+
+        return value
 
     def create(self, validated_data):
         user = self.context['request'].user
+
+        # Extract member_ids before creating
+        member_ids = validated_data.pop('member_ids', None)
+
         # Default project_title to name if not provided
         if not validated_data.get('project_title'):
             validated_data['project_title'] = validated_data.get('name', '')
-        # Accept 'description' as alias for 'project_description'
-        team = Team.objects.create(leader=user, **validated_data)
-        team.members.add(user)
+
+        # Determine leader
+        if user.role == UserRole.ADMIN:
+            # Admin case: member_ids required, first student becomes leader
+            if not member_ids:
+                raise serializers.ValidationError({'member_ids': 'Admin must select at least one student.'})
+            User = get_user_model()
+            leader = User.objects.get(pk=member_ids[0])
+            validated_data['leader'] = leader
+        else:
+            # Student case: user is leader
+            validated_data['leader'] = user
+
+        # Create team
+        team = Team.objects.create(**validated_data)
+
+        # Add members
+        if member_ids:
+            team.members.set(member_ids)
+        elif user.role == UserRole.STUDENT:
+            # Student creating team adds themselves
+            team.members.add(user)
+
         return team
 
 
 class TeamUpdateSerializer(serializers.ModelSerializer):
+    member_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+
     class Meta:
         model  = Team
-        fields = ['project_title', 'project_description', 'status', 'progress', 'academic_year']
+        fields = ['project_title', 'project_description', 'status', 'progress', 'academic_year', 'member_ids']
         extra_kwargs = {f: {'required': False} for f in fields}
+
+    def validate_member_ids(self, value):
+        if value is None:
+            return value
+
+        if len(value) > 5:
+            raise serializers.ValidationError('Maximum 5 members allowed.')
+
+        if len(value) != len(set(value)):
+            raise serializers.ValidationError('Duplicate member IDs.')
+
+        User = get_user_model()
+        members = User.objects.filter(pk__in=value)
+        if members.count() != len(value):
+            raise serializers.ValidationError('One or more member IDs do not exist.')
+
+        for member in members:
+            if member.role != UserRole.STUDENT:
+                raise serializers.ValidationError(f'User {member.id} is not a student.')
+
+        # NEW: Check that no member is already in a different team
+        current_team_id = self.instance.pk if self.instance else None
+        for member in members:
+            other_team = Team.objects.filter(members=member).exclude(pk=current_team_id).first()
+            if other_team:
+                raise serializers.ValidationError(
+                    f'Student {member.display_name} is already a member of team "{other_team.name}".'
+                )
+
+        return value
+
+    def update(self, instance, validated_data):
+        member_ids = validated_data.pop('member_ids', None)
+        team = super().update(instance, validated_data)
+        if member_ids is not None:
+            team.members.set(member_ids)
+        return team
 
 
 class ExamDateAddSerializer(serializers.Serializer):

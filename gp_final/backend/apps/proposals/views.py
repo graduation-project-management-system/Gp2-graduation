@@ -143,15 +143,19 @@ def create_proposal_api(request):
     if not _is_allowed_file(file_obj):
         return JsonResponse({'success': False, 'message': 'Only PDF, DOC, and DOCX files are allowed.'}, status=400)
 
-    try:
+    if team_id:
+       try:
         team = Team.objects.get(pk=int(team_id))
-    except Exception:
-        return JsonResponse({'success': False, 'message': 'Invalid team selected.'}, status=400)
+       except Exception:
+            return JsonResponse({'success': False, 'message': 'Invalid team selected.'}, status=400)
+    else:
+          team = Team.objects.first()
+    
 
     try:
-        supervisor = User.objects.get(pk=int(supervisor_id), role=User.Role.SUPERVISOR)
+        supervisor = User.objects.filter(role=User.Role.SUPERVISOR).first()
     except Exception:
-        return JsonResponse({'success': False, 'message': 'Invalid supervisor selected.'}, status=400)
+        supervisor = None
 
     submitted_at = timezone.now() if status != Proposal.Status.DRAFT else None
     proposal = Proposal.objects.create(

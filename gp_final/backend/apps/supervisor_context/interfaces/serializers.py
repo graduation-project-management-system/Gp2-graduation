@@ -138,8 +138,8 @@ class GradingReportInputSerializer(serializers.Serializer):
     team_id            = serializers.IntegerField(min_value=1)
     phase              = serializers.ChoiceField(choices=['Proposal', 'Midterm', 'Final'])
     chief_grade        = serializers.FloatField(min_value=0, max_value=100)
-    examiner_one_grade = serializers.FloatField(min_value=0, max_value=100)
-    examiner_two_grade = serializers.FloatField(min_value=0, max_value=100)
+    examiner_one_grade = serializers.FloatField(min_value=0, max_value=100, required=False, allow_null=True, default=None)
+    examiner_two_grade = serializers.FloatField(min_value=0, max_value=100, required=False, allow_null=True, default=None)
     feedback           = serializers.CharField(required=False, allow_blank=True, default='')
 
 

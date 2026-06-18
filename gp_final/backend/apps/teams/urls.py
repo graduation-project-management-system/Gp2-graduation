@@ -20,6 +20,7 @@ urlpatterns = [
     path('<int:pk>/leave/',                             views.leave_team,                      name='leave_team'),
     path('<int:pk>/approve/',                           views.approve_team,                    name='team-approve'),
     path('<int:pk>/reject/',                            views.reject_team,                     name='team-reject'),
+    path('<int:pk>/archive/',                           views.archive_team,                    name='team-archive'),
     path('<int:pk>/supervisor-request/',                views.create_supervision_request,      name='team-supervisor-request'),
     path('<int:pk>/supervisor-requests/',               views.team_supervision_requests,       name='team-supervisor-requests'),
 ]

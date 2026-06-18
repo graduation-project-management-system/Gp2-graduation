@@ -8,59 +8,69 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+    body { background: #f8fafc; }
 
     h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 6px; }
-    .page-sub { color: #64748b; font-size: 0.875rem; margin-bottom: 18px; }
+    .page-sub { color: #64748b; font-size: 0.875rem; margin-bottom: 20px; }
 
     .flash { padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; font-size: 13px; display: none; }
     .flash-ok  { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
     .flash-err { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
 
-    .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
 
     .card {
       background: #fff; border-radius: 14px;
-      padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,.05);
+      padding: 22px; box-shadow: 0 4px 20px rgba(0,0,0,.06);
+      margin-bottom: 16px;
     }
-    .card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 14px; }
+    .card-title {
+      font-size: 15px; font-weight: 700; margin-bottom: 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
 
     label { display: block; font-size: 13px; font-weight: 600; margin-top: 12px; margin-bottom: 5px; color: #0f172a; }
     input[type=number], input[type=file], select, textarea {
       width: 100%; border: 1px solid #cbd5e1; border-radius: 8px;
       padding: 9px 10px; font-size: 14px; font-family: inherit;
     }
-    textarea { min-height: 80px; resize: vertical; }
+    textarea { min-height: 70px; resize: vertical; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: #2563eb; }
 
-    .final-box {
-      margin: 14px 0; padding: 10px 14px; border-radius: 8px;
-      background: #eff6ff; border: 1px solid #bfdbfe;
-      color: #1e3a8a; font-weight: 600; font-size: 0.95rem;
-    }
-
     .btn {
-      margin-top: 14px; border: 0; padding: 10px 18px;
+      margin-top: 14px; border: 0; padding: 10px 20px;
       border-radius: 8px; cursor: pointer; font-size: 13px;
-      font-weight: 600; background: #2563eb; color: #fff;
-      transition: background 0.15s;
+      font-weight: 600; color: #fff; transition: opacity .15s;
     }
-    .btn:hover { background: #1d4ed8; }
+    .btn:hover { opacity: .88; }
+    .btn-blue   { background: #2563eb; }
+    .btn-amber  { background: #d97706; }
 
-    /* Search */
-    .search-input {
-      width: 100%; border: 1px solid #cbd5e1; border-radius: 8px;
-      padding: 9px 10px; font-size: 14px; margin-bottom: 14px;
+    .section-header {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 700; color: #475569;
+      text-transform: uppercase; letter-spacing: .05em;
+      margin: 20px 0 10px;
+      padding-bottom: 8px; border-bottom: 2px solid #e2e8f0;
     }
-    .search-input:focus { outline: none; border-color: #2563eb; }
+    .badge {
+      display: inline-block; padding: 2px 9px; border-radius: 20px;
+      font-size: 11px; font-weight: 700; text-transform: none; letter-spacing: 0;
+    }
+    .badge-purple { background: #ede9fe; color: #5b21b6; }
+    .badge-amber  { background: #fef3c7; color: #92400e; }
 
-    /* Reports table */
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; text-align: left; }
-    th { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; }
-    td strong { color: #2563eb; }
+    th, td { padding: 9px 8px; border-bottom: 1px solid #f1f5f9; text-align: left; }
+    th { font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600; background: #f8fafc; }
+    .my-grade { color: #2563eb; font-weight: 700; }
 
-    .empty { color: #94a3b8; text-align: center; padding: 1.5rem; font-size: 13px; }
+    .tag-pending { display:inline-block;padding:2px 8px;border-radius:12px;background:#fef9c3;color:#a16207;font-size:11px;font-weight:600; }
+    .tag-done    { display:inline-block;padding:2px 8px;border-radius:12px;background:#dcfce7;color:#166534;font-size:11px;font-weight:600; }
+    .empty { color: #94a3b8; text-align: center; padding: 20px; font-size: 13px; }
+
+    .no-exam-teams { background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:16px;color:#94a3b8;font-size:13px;text-align:center; }
   </style>
 </head>
 <body>
@@ -68,57 +78,96 @@
 
   <main class="main-content">
     <h1>Grading &amp; Reports</h1>
-    <p class="page-sub">Weighted grading (Chief 50% · Examiner 1 25% · Examiner 2 25%) — final grade calculated automatically.</p>
+    <p class="page-sub">Submit your grade for each team. Final grade is calculated when all grades are in.</p>
 
     <div id="msg" class="flash"></div>
 
-    <div class="layout">
-      <!-- Left: form -->
-      <section class="card">
-        <h2>Submit New Report</h2>
-        <form id="grade-form">
-          <label>Team</label>
-          <select name="team_id" id="g-team" required></select>
+    <div class="grid-2">
 
-          <label>Phase</label>
-          <select name="phase" required>
-            <option value="Proposal">Proposal</option>
-            <option value="Midterm">Midterm</option>
-            <option value="Final">Final</option>
-          </select>
+      <!-- ── LEFT: Forms ── -->
+      <div>
 
-          <label>Chief Supervisor Grade (0–100)</label>
-          <input type="number" name="chief_grade" min="0" max="100" step="0.01" required />
+        <!-- Chief supervisor form -->
+        <div class="card" id="chief-card">
+          <div class="card-title">
+            🎓 <span>Submit Supervisor Grade</span>
+            <span class="badge badge-purple">Chief Supervisor</span>
+          </div>
+          <div id="chief-no-teams" class="no-exam-teams" style="display:none;">
+            No teams assigned to you as chief supervisor.
+          </div>
+          <form id="chief-form">
+            <label>Team</label>
+            <select name="team_id" id="chief-team" required></select>
 
-          <label>Examiner 1 Grade (0–100)</label>
-          <input type="number" name="examiner_one_grade" min="0" max="100" step="0.01" required />
+            <label>Phase</label>
+            <select name="phase" required>
+              <option value="Proposal">Proposal</option>
+              <option value="Midterm">Midterm</option>
+              <option value="Final">Final</option>
+            </select>
 
-          <label>Examiner 2 Grade (0–100)</label>
-          <input type="number" name="examiner_two_grade" min="0" max="100" step="0.01" required />
+            <label>Your Grade (0–100)</label>
+            <input type="number" name="chief_grade" min="0" max="100" step="0.01" required />
 
-          <div class="final-box">Final Grade: <span id="preview-final">—</span></div>
+            <button type="submit" class="btn btn-blue">Save My Grade</button>
+          </form>
+        </div>
 
-          <label>Feedback</label>
-          <textarea name="feedback" rows="3"></textarea>
+        <!-- Examiner form — only shown if admin assigned them as examiner in defense -->
+        <div class="card" id="examiner-card" style="display:none;">
+          <div class="card-title">
+            📋 <span>Submit Examiner Grade</span>
+            <span class="badge badge-amber">Examiner</span>
+          </div>
+          <p style="font-size:12px;color:#64748b;margin-bottom:12px;">
+            These are teams assigned to you as examiner by the admin in the defense schedule.
+          </p>
+          <form id="examiner-form">
+            <label>Team</label>
+            <select name="team_id" id="examiner-team" required></select>
 
-          <label>Archive File (optional)</label>
-          <input type="file" name="archived_file" />
+            <label>Phase</label>
+            <select name="phase" required>
+              <option value="Proposal">Proposal</option>
+              <option value="Midterm">Midterm</option>
+              <option value="Final">Final</option>
+            </select>
 
-          <button type="submit" class="btn">Save Report</button>
-        </form>
-      </section>
+            <label>Your Examiner Grade (0–100)</label>
+            <input type="number" name="grade" min="0" max="100" step="0.01" required />
 
-      <!-- Right: reports list -->
-      <section class="card">
-        <h2>Saved Reports</h2>
-        <input type="text" id="search-input" class="search-input" placeholder="Search by team or phase…" />
-        <div id="rep-wrap"><p class="empty">Loading…</p></div>
-      </section>
+            <button type="submit" class="btn btn-amber">Save Examiner Grade</button>
+          </form>
+        </div>
+
+      </div>
+
+      <!-- ── RIGHT: Reports ── -->
+      <div class="card">
+        <div class="card-title">📊 Saved Reports</div>
+        <input type="text" id="search-input" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:4px;" placeholder="Search…" />
+
+        <!-- Section 1: As Chief Supervisor -->
+        <div class="section-header">
+          <span class="badge badge-purple">Chief</span> My Teams — Supervisor Grades
+        </div>
+        <div id="chief-reports"><p class="empty">Loading…</p></div>
+
+        <!-- Section 2: As Examiner -->
+        <div id="examiner-reports-section" style="display:none;">
+          <div class="section-header">
+            <span class="badge badge-amber">Examiner</span> Teams I'm Examining
+          </div>
+          <div id="examiner-reports"><p class="empty">Loading…</p></div>
+        </div>
+      </div>
+
     </div>
   </main>
 
-  <script src="/api.js"></script>
-  <script src="/static/supervisor-common.js"></script>
+  <script src="/static/api.js?v=2"></script>
+  <script src="/static/supervisor-common.js?v=2"></script>
   <script>
     GPNav.mount('grading');
 
@@ -127,118 +176,182 @@
       m.textContent = text;
       m.className = 'flash ' + (ok ? 'flash-ok' : 'flash-err');
       m.style.display = 'block';
+      setTimeout(() => { m.style.display = 'none'; }, 4000);
     }
 
     function esc(s) {
-      if (!s) return '';
+      if (s == null) return '—';
       const d = document.createElement('div');
-      d.textContent = s;
+      d.textContent = String(s);
       return d.innerHTML;
     }
 
-    // Live final-grade preview
-    let previewTimer;
-    async function runPreview() {
-      const fd = new FormData(document.getElementById('grade-form'));
-      const c = fd.get('chief_grade'), e1 = fd.get('examiner_one_grade'), e2 = fd.get('examiner_two_grade');
-      if (c === '' || e1 === '' || e2 === '') {
-        document.getElementById('preview-final').textContent = '—';
-        return;
-      }
-      try {
-        const p = await GPApi.gradingPreview({ chief_grade: c, examiner_one_grade: e1, examiner_two_grade: e2 });
-        document.getElementById('preview-final').textContent = p.final_grade;
-      } catch {
-        document.getElementById('preview-final').textContent = '—';
-      }
-    }
-    document.getElementById('grade-form').querySelectorAll('input[type=number]').forEach((inp) => {
-      inp.addEventListener('input', () => { clearTimeout(previewTimer); previewTimer = setTimeout(runPreview, 300); });
-    });
+    // examinerTeams: [{team_id, team_name, position}]
+    let examinerTeams = [];
+    let allReports    = [];
+    let chiefTeamIds  = new Set();
 
-    // Load teams into select
+    /* ─── Load teams ─────────────────────────────────────── */
     async function loadTeams() {
-      const sel = document.getElementById('g-team');
-      const teams = await GPApi.teams();
-      sel.innerHTML = teams.length
-        ? teams.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')
-        : '<option value="">— No teams —</option>';
+      const [allTeams, examList] = await Promise.all([
+        GPApi.teams(),
+        GPApi.apiFetch('/grading/examiner-teams/').then(r => r.json()).catch(() => []),
+      ]);
+
+      examinerTeams = Array.isArray(examList) ? examList : [];
+      const examinerTeamIds = new Set(examinerTeams.map(t => t.team_id));
+
+      // Chief teams = assigned to me but NOT as examiner
+      const chiefTeams = allTeams.filter(t => !examinerTeamIds.has(t.id));
+      chiefTeamIds = new Set(chiefTeams.map(t => t.id));
+
+      // Populate chief dropdown
+      const chiefSel = document.getElementById('chief-team');
+      if (chiefTeams.length === 0) {
+        chiefSel.closest('form').style.display = 'none';
+        document.getElementById('chief-no-teams').style.display = 'block';
+      } else {
+        chiefSel.innerHTML = chiefTeams.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
+      }
+
+      // Populate examiner dropdown (only from defense schedule)
+      if (examinerTeams.length > 0) {
+        document.getElementById('examiner-card').style.display = 'block';
+        document.getElementById('examiner-reports-section').style.display = 'block';
+        const exSel = document.getElementById('examiner-team');
+        exSel.innerHTML = examinerTeams.map(t =>
+          `<option value="${t.team_id}">${esc(t.team_name)} — Examiner ${t.position}</option>`
+        ).join('');
+      }
     }
 
-    // Render reports table with optional client-side search
-    let allReports = [];
+    /* ─── Load & render reports ──────────────────────────── */
     async function loadReports() {
-      const w = document.getElementById('rep-wrap');
       try {
         allReports = await GPApi.gradingList();
-        renderTable();
+        renderReports();
       } catch (e) {
-        w.innerHTML = `<p class="empty">${esc(e.message)}</p>`;
+        document.getElementById('chief-reports').innerHTML = `<p class="empty">${esc(e.message)}</p>`;
       }
     }
 
-    function renderTable() {
+    function renderReports() {
       const q = (document.getElementById('search-input').value || '').toLowerCase();
-      const rows = allReports.filter(
-        (r) => !q || (r.team_name || '').toLowerCase().includes(q) || (r.phase || '').toLowerCase().includes(q)
+      const examinerTeamIds = new Set(examinerTeams.map(t => t.team_id));
+
+      const filtered = allReports.filter(r =>
+        !q || (r.team_name || '').toLowerCase().includes(q) || (r.phase || '').toLowerCase().includes(q)
       );
-      const w = document.getElementById('rep-wrap');
-      if (!rows.length) { w.innerHTML = '<p class="empty">No reports found.</p>'; return; }
-      w.innerHTML = `
-        <table>
-          <thead><tr><th>Team</th><th>Phase</th><th>Chief</th><th>E1</th><th>E2</th><th>Final</th><th>Date</th></tr></thead>
-          <tbody>
-            ${rows.map((r) => `
-              <tr>
-                <td>${esc(r.team_name)}</td>
-                <td>${esc(r.phase)}</td>
-                <td>${esc(String(r.chief_grade))}</td>
-                <td>${esc(String(r.examiner_one_grade))}</td>
-                <td>${esc(String(r.examiner_two_grade))}</td>
-                <td><strong>${esc(String(r.final_grade))}</strong></td>
-                <td>${esc((r.created_at || '').slice(0, 10))}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>`;
+
+      // Split: chief = I'm the assigned supervisor; examiner = team is in my examiner list
+      const chiefRows    = filtered.filter(r => !examinerTeamIds.has(r.team_id ?? r.team));
+      const examinerRows = filtered.filter(r =>  examinerTeamIds.has(r.team_id ?? r.team));
+
+      // ── Chief table ──
+      const cEl = document.getElementById('chief-reports');
+      if (chiefRows.length === 0) {
+        cEl.innerHTML = '<p class="empty">No reports submitted yet.</p>';
+      } else {
+        cEl.innerHTML = `
+          <table>
+            <thead><tr>
+              <th>Team</th><th>Phase</th>
+              <th>My Grade</th><th>Ex.1</th><th>Ex.2</th>
+              <th>Final</th><th>Status</th>
+            </tr></thead>
+            <tbody>
+              ${chiefRows.map(r => `
+                <tr>
+                  <td>${esc(r.team_name)}</td>
+                  <td>${esc(r.phase)}</td>
+                  <td class="my-grade">${r.chief_grade != null ? Number(r.chief_grade).toFixed(2) : '—'}</td>
+                  <td>${r.examiner_one_grade != null ? Number(r.examiner_one_grade).toFixed(2) : '—'}</td>
+                  <td>${r.examiner_two_grade != null ? Number(r.examiner_two_grade).toFixed(2) : '—'}</td>
+                  <td>${r.final_grade != null ? `<strong>${Number(r.final_grade).toFixed(2)}</strong>` : '—'}</td>
+                  <td>${r.final_grade != null ? '<span class="tag-done">Complete</span>' : '<span class="tag-pending">Pending</span>'}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>`;
+      }
+
+      // ── Examiner table ──
+      if (examinerTeams.length > 0) {
+        const eEl = document.getElementById('examiner-reports');
+        if (examinerRows.length === 0) {
+          eEl.innerHTML = '<p class="empty">No reports yet for teams you examine.</p>';
+        } else {
+          eEl.innerHTML = `
+            <table>
+              <thead><tr>
+                <th>Team</th><th>Phase</th>
+                <th>Chief Grade</th><th>My Grade</th><th>Ex.2</th>
+                <th>Final</th><th>Status</th>
+              </tr></thead>
+              <tbody>
+                ${examinerRows.map(r => {
+                  const myTeam = examinerTeams.find(t => t.team_id === (r.team_id ?? r.team));
+                  const isEx1 = myTeam?.position === 1;
+                  const myGrade   = isEx1 ? r.examiner_one_grade  : r.examiner_two_grade;
+                  const otherGrade = isEx1 ? r.examiner_two_grade : r.examiner_one_grade;
+                  return `
+                    <tr>
+                      <td>${esc(r.team_name)}</td>
+                      <td>${esc(r.phase)}</td>
+                      <td>${r.chief_grade != null ? Number(r.chief_grade).toFixed(2) : '—'}</td>
+                      <td class="my-grade">${myGrade != null ? Number(myGrade).toFixed(2) : '—'}</td>
+                      <td>${otherGrade != null ? Number(otherGrade).toFixed(2) : '—'}</td>
+                      <td>${r.final_grade != null ? `<strong>${Number(r.final_grade).toFixed(2)}</strong>` : '—'}</td>
+                      <td>${r.final_grade != null ? '<span class="tag-done">Complete</span>' : '<span class="tag-pending">Pending</span>'}</td>
+                    </tr>`;
+                }).join('')}
+              </tbody>
+            </table>`;
+        }
+      }
     }
 
-    document.getElementById('search-input').addEventListener('input', renderTable);
+    document.getElementById('search-input').addEventListener('input', renderReports);
 
-    // Submit grading form
-    document.getElementById('grade-form').addEventListener('submit', async (e) => {
+    /* ─── Submit chief grade ─────────────────────────────── */
+    document.getElementById('chief-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
-      const fileInput = e.target.querySelector('input[type=file]');
-      const hasFile   = fileInput && fileInput.files.length > 0;
-
       try {
-        let res;
-        if (hasFile) {
-          // Use FormData when a file is attached
-          res = await GPApi.apiFetch('/supervisor/grading/', { method: 'POST', body: fd });
-        } else {
-          // JSON for text-only fields (exclude the empty file field)
-          const body = {};
-          fd.forEach((v, k) => { if (!(v instanceof File)) body[k] = v; });
-          res = await GPApi.apiFetch('/supervisor/grading/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          });
-        }
+        const res = await GPApi.apiFetch('/supervisor/grading/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ team_id: Number(fd.get('team_id')), phase: fd.get('phase'), chief_grade: fd.get('chief_grade') }),
+        });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || data.detail || 'Failed to save report');
-        flash('Report saved and team notified.', true);
-        e.target.querySelector('textarea[name=feedback]').value = '';
-        if (fileInput) fileInput.value = '';
-        GPNav.updateUnreadBadge();
+        if (!res.ok) throw new Error(data.error || data.detail || 'Failed to save');
+        flash('Your supervisor grade saved.', true);
         await loadReports();
       } catch (err) { flash(err.message, false); }
     });
 
-    (async function () {
-      try { await loadTeams(); await loadReports(); runPreview(); }
-      catch (e) { flash(e.message, false); }
+    /* ─── Submit examiner grade ──────────────────────────── */
+    document.getElementById('examiner-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      try {
+        const res = await GPApi.apiFetch('/grading/examiner-grade/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ team_id: Number(fd.get('team_id')), phase: fd.get('phase'), grade: fd.get('grade') }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || data.detail || 'Failed to save');
+        flash('Your examiner grade saved.', true);
+        await loadReports();
+      } catch (err) { flash(err.message, false); }
+    });
+
+    /* ─── Init ───────────────────────────────────────────── */
+    (async () => {
+      try {
+        await loadTeams();
+        await loadReports();
+      } catch (e) { flash(e.message, false); }
     })();
   </script>
 </body>

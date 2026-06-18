@@ -3,6 +3,7 @@ Domain Value Objects — immutable, equality-by-value, self-validating.
 """
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 import datetime
 
 
@@ -57,22 +58,26 @@ class WeightedGrade:
     """
     Encapsulates the three grading scores and computes the weighted final grade.
     Weights: chief_supervisor 50%, examiner_one 25%, examiner_two 25%.
+    Examiner grades are optional (None until submitted).
     """
     chief_grade:        float
-    examiner_one_grade: float
-    examiner_two_grade: float
+    examiner_one_grade: Optional[float]
+    examiner_two_grade: Optional[float]
 
     def __post_init__(self):
+        if not (0.0 <= self.chief_grade <= 100.0):
+            raise ValueError(f"chief_grade must be between 0 and 100, got {self.chief_grade}.")
         for name, score in [
-            ('chief_grade',        self.chief_grade),
             ('examiner_one_grade', self.examiner_one_grade),
             ('examiner_two_grade', self.examiner_two_grade),
         ]:
-            if not (0.0 <= score <= 100.0):
+            if score is not None and not (0.0 <= score <= 100.0):
                 raise ValueError(f"{name} must be between 0 and 100, got {score}.")
 
     @property
-    def final_grade(self) -> float:
+    def final_grade(self) -> Optional[float]:
+        if self.examiner_one_grade is None or self.examiner_two_grade is None:
+            return None
         return round(
             self.chief_grade        * 0.50 +
             self.examiner_one_grade * 0.25 +

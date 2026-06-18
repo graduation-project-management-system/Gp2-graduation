@@ -2,6 +2,7 @@ import json
 from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -11,6 +12,16 @@ from apps.accounts.models import UserRole
 from apps.notifications.utils import push_notification
 from .models import Team, ExamDate, MembershipRequest, SupervisionRequest
 from .permissions import IsSupervisor, IsStudent, IsTeamLeader
+
+
+def _supervisor_capacity_error(supervisor, current_team=None):
+    max_teams = getattr(settings, 'MAX_TEAMS_PER_SUPERVISOR', 5)
+    assigned = Team.objects.filter(assigned_supervisor=supervisor)
+    if current_team is not None:
+        assigned = assigned.exclude(pk=current_team.pk)
+    if assigned.count() >= max_teams:
+        return f'Supervisor {supervisor.display_name} is full ({max_teams}/{max_teams} teams).'
+    return None
 
 
 # ── List / Create teams ───────────────────────────────────────────────────────
@@ -37,28 +48,33 @@ def team_list_create(request):
 
     # POST — students or admin
     if request.user.role == UserRole.ADMIN:
-        from .serializers import TeamSerializer
-        name        = (request.data.get('name') or '').strip()
-        proj_title  = (request.data.get('project_title') or name).strip()
-        proj_desc   = (request.data.get('project_description') or '').strip()
-        stat        = request.data.get('status', 'forming')
-        if not name:
-            return Response({'error': 'Team name is required.'}, status=400)
-        if Team.objects.filter(name=name).exists():
-            return Response({'error': 'A team with this name already exists.'}, status=400)
-        team = Team.objects.create(
-            name=name, project_title=proj_title,
-            project_description=proj_desc, status=stat,
-        )
-        # Assign supervisor if provided
+        # Use serializer for validation and member_ids support
+        from .serializers import TeamSerializer, TeamCreateSerializer
+
+        data = request.data.copy()
+        # Accept 'description' as alias for 'project_description'
+        if 'description' in data and 'project_description' not in data:
+            data['project_description'] = data['description']
+
+        serializer = TeamCreateSerializer(data=data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        supervisor_to_assign = None
         sup_id = request.data.get('supervisor_id')
         if sup_id:
             from apps.accounts.models import User as UserModel
             try:
-                team.assigned_supervisor = UserModel.objects.get(pk=sup_id, role='supervisor')
-                team.save(update_fields=['assigned_supervisor'])
+                supervisor_to_assign = UserModel.objects.get(pk=sup_id, role='supervisor')
             except UserModel.DoesNotExist:
-                pass
+                supervisor_to_assign = None
+            if supervisor_to_assign:
+                capacity_error = _supervisor_capacity_error(supervisor_to_assign)
+                if capacity_error:
+                    return Response({'error': capacity_error}, status=400)
+        team = serializer.save()
+        # Assign supervisor if provided
+        if supervisor_to_assign:
+            team.assigned_supervisor = supervisor_to_assign
+            team.save(update_fields=['assigned_supervisor'])
         return Response(TeamSerializer(team).data, status=201)
 
     if request.user.role != UserRole.STUDENT:
@@ -126,7 +142,23 @@ def team_detail(request, pk):
                     team.assigned_supervisor = None
                 else:
                     try:
-                        team.assigned_supervisor = UserModel.objects.get(pk=supervisor_id, role='supervisor')
+                        supervisor = UserModel.objects.get(pk=supervisor_id, role='supervisor')
+                        capacity_error = _supervisor_capacity_error(supervisor, current_team=team)
+                        if capacity_error:
+                            return Response({'error': capacity_error}, status=400)
+                        if team.assigned_supervisor_id != supervisor.pk:
+                            team.assigned_supervisor = supervisor
+                            # Notify team members about new supervisor
+                            for member in team.members.all():
+                                push_notification(
+                                    recipient_id=member.pk,
+                                    title='Supervisor assigned',
+                                    message=f'Dr. {supervisor.display_name} has been assigned as your supervisor by admin.',
+                                    notif_type='supervisor_assigned',
+                                    team_name=team.name,
+                                )
+                        else:
+                            team.assigned_supervisor = supervisor
                     except UserModel.DoesNotExist:
                         pass
 
@@ -156,6 +188,14 @@ def approve_team(request, pk):
     team = get_object_or_404(Team, pk=pk)
     team.status = 'active'
     team.save(update_fields=['status'])
+    for member in team.members.all():
+        push_notification(
+            recipient_id=member.pk,
+            title='Team approved',
+            message=f'Your team "{team.name}" has been approved by admin.',
+            notif_type='general',
+            team_name=team.name,
+        )
     return Response({'success': True, 'message': f'Team "{team.name}" approved.'})
 
 
@@ -168,7 +208,30 @@ def reject_team(request, pk):
     team = get_object_or_404(Team, pk=pk)
     team.status = 'disbanded'
     team.save(update_fields=['status'])
+    for member in team.members.all():
+        push_notification(
+            recipient_id=member.pk,
+            title='Team rejected',
+            message=f'Your team "{team.name}" has been rejected by admin.',
+            notif_type='general',
+            team_name=team.name,
+        )
     return Response({'success': True, 'message': f'Team "{team.name}" rejected.'})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def archive_team(request, pk):
+    """POST /api/v1/teams/<pk>/archive/ — admin only, only complete teams."""
+    if request.user.role != UserRole.ADMIN:
+        return Response({'error': 'Admin only.'}, status=403)
+    team = get_object_or_404(Team, pk=pk)
+    if team.status != 'complete':
+        return Response({'error': 'Only completed teams can be archived.'}, status=400)
+    team.is_archived = True
+    team.archive_date = timezone.now()
+    team.save(update_fields=['is_archived', 'archive_date'])
+    return Response({'success': True, 'message': f'Team "{team.name}" archived.'})
 
 
 # ── Exam dates ────────────────────────────────────────────────────────────────
@@ -404,31 +467,40 @@ def leave_team(request, pk):
         # إذا ما في أعضاء غيره → احذف التيم
         if not remaining_members.exists():
             team.delete()
-
-            return Response({
-                'detail': 'Leader left and the team was deleted.'
-            })
+            return Response({'detail': 'Leader left and the team was deleted.'})
 
         # إذا في أعضاء → نقل القيادة
         new_leader = remaining_members.first()
-
-        # إزالة الليدر القديم
         team.members.remove(request.user)
-
-        # تعيين ليدر جديد
         team.leader = new_leader
         team.save()
 
-        return Response({
-            'detail': f'Leadership transferred to {new_leader.display_name}.'
-        })
+        # Notify remaining members about new leader
+        for member in team.members.all():
+            push_notification(
+                recipient_id=member.pk,
+                title='New team leader',
+                message=f'{request.user.display_name} left. {new_leader.display_name} is now the team leader.',
+                notif_type='general',
+                team_name=team.name,
+            )
+
+        return Response({'detail': f'Leadership transferred to {new_leader.display_name}.'})
 
     # ── عضو عادي ────────────────────────────────────
     team.members.remove(request.user)
 
-    return Response({
-        'detail': 'You have left the team.'
-    })
+    # Notify team leader
+    if team.leader:
+        push_notification(
+            recipient_id=team.leader.pk,
+            title='Member left',
+            message=f'{request.user.display_name} has left {team.name}.',
+            notif_type='general',
+            team_name=team.name,
+        )
+
+    return Response({'detail': 'You have left the team.'})
 
 
 # ── Cancel own join request ───────────────────────────────────────────────────

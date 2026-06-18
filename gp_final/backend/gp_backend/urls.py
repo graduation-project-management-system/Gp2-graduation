@@ -5,6 +5,7 @@ from django.conf.urls.static import static
 from django.views.generic import TemplateView, RedirectView
 from rest_framework_simplejwt.views import TokenRefreshView
 from gp_backend import admin_api
+from apps.proposals import views as proposal_views
 
 
 def page(name):
@@ -58,7 +59,7 @@ urlpatterns = [
     path('api/dashboard/',                   admin_api.dashboard,        name='admin-dashboard'),
     # Proposals
     path('api/proposals/',                   admin_api.proposals_list,   name='admin-proposals'),
-    path('api/proposals/create/',            admin_api.proposals_list,   name='admin-proposals-create'),
+    path('api/proposals/create/',            proposal_views.create_proposal_api, name='admin-proposals-create'),
     path('api/proposals/<int:pk>/',          admin_api.proposal_detail,  name='admin-proposal-detail'),
     path('api/proposals/<int:pk>/approve/',  admin_api.proposal_approve, name='admin-proposal-approve'),
     path('api/proposals/<int:pk>/reject/',   admin_api.proposal_reject,  name='admin-proposal-reject'),

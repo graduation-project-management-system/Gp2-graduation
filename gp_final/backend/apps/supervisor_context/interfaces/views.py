@@ -12,6 +12,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.accounts.models import UserRole
+from apps.requests.models import SupervisorRequest as SupervisorRequestModel
+from apps.requests.serializers import SupervisorRequestSerializer
 
 from ..application.use_cases import (
     ManageAvailabilityUseCase,
@@ -172,13 +174,10 @@ def supervision_requests(request):
     if guard:
         return guard
 
-    uc = DecideSupervisionRequestUseCase(
-        request_repo=DjangoSupervisorRequestRepository(),
-        team_repo=DjangoTeamRepository(),
-        notif_repo=DjangoNotificationRepository(),
+    qs = SupervisorRequestModel.objects.filter(
+        target_supervisor=request.user, status='pending'
     )
-    reqs = uc.list_pending(request.user.pk)
-    return Response(SupervisorRequestOutputSerializer(reqs, many=True).data)
+    return Response(SupervisorRequestSerializer(qs, many=True, context={'request': request}).data)
 
 
 @api_view(['POST'])

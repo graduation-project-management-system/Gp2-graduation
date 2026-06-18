@@ -36,13 +36,6 @@
     .progress { height: 10px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin: 10px 0 14px; }
     .progress-bar { height: 100%; background: #22c55e; }
 
-    .field-row { display: flex; align-items: flex-end; gap: 8px; margin-top: 12px; }
-    .field-row label { font-size: 12px; font-weight: 600; color: #475569; }
-    .field-row input[type=date] {
-      border: 1px solid #cbd5e1; border-radius: 8px;
-      padding: 8px 10px; font-size: 13px; flex: 1;
-    }
-
     .comment-label { font-size: 12px; font-weight: 600; color: #475569; margin-top: 14px; margin-bottom: 6px; display: block; }
     .comment-ta {
       width: 100%; border: 1px solid #cbd5e1; border-radius: 8px;
@@ -63,20 +56,6 @@
 
     .empty { color: #94a3b8; text-align: center; padding: 2rem; }
 
-    /* Exam date chips */
-    .exam-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
-    .exam-chip {
-      display: inline-flex; align-items: center; gap: 6px;
-      background: #fef3c7; color: #92400e;
-      border-radius: 20px; padding: 4px 10px; font-size: 12px; font-weight: 600;
-    }
-    .exam-chip button {
-      border: none; background: none; cursor: pointer;
-      color: #b45309; font-size: 14px; line-height: 1;
-      padding: 0; display: flex; align-items: center;
-    }
-    .exam-chip button:hover { color: #dc2626; }
-    .exam-label { font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; display: block; }
   </style>
 </head>
 <body>
@@ -84,14 +63,14 @@
 
   <main class="main-content">
     <h1>My Teams</h1>
-    <p class="page-sub">Accepted teams assigned to you — add exam dates and send comments as notifications.</p>
+    <p class="page-sub">Accepted teams assigned to you — send comments as notifications.</p>
 
     <div id="msg" class="flash"></div>
     <div id="teams"></div>
   </main>
 
-  <script src="/api.js"></script>
-  <script src="/static/supervisor-common.js"></script>
+  <script src="/static/api.js?v=2"></script>
+  <script src="/static/supervisor-common.js?v=2"></script>
   <script>
     GPNav.mount('teams');
 
@@ -122,33 +101,14 @@
         root.innerHTML = `<div class="teams-grid">${teams.map((t) => {
           const members = (t.members || []).map((m) => esc(m.display_name || m.email)).join(', ') || '—';
           const prog    = Math.min(100, (t.progress ?? 0));
-          const examChips = (t.exam_dates || []).length
-            ? (t.exam_dates || []).map((e) =>
-                `<span class="exam-chip">
-                   <i class="fas fa-star" style="font-size:10px"></i> ${esc(String(e.date))}
-                   <button type="button" class="del-exam-btn" data-team="${t.id}" data-date="${esc(String(e.date))}" title="Remove">×</button>
-                 </span>`).join('')
-            : '<span style="font-size:12px;color:#94a3b8">No exam dates set</span>';
-
           return `
-          <div class="team-card" id="team-${t.id}">
+          <div class="team-card" id="team-${t.id}" style="min-height:420px;">
             <h3>${esc(t.name)}</h3>
             <p class="sub">${esc(t.project_title || '')}</p>
             <p>${esc(t.project_description || '')}</p>
             <div class="progress"><div class="progress-bar" style="width:${prog}%"></div></div>
             <p><strong>Status:</strong> ${esc(t.status)} &nbsp;·&nbsp; <strong>Progress:</strong> ${prog}%</p>
             <p><strong>Members:</strong> ${members}</p>
-
-            <span class="exam-label"><i class="fas fa-calendar-check"></i> Exam Dates</span>
-            <div class="exam-chips">${examChips}</div>
-
-            <div class="field-row">
-              <div style="flex:1">
-                <label>Add Exam Date</label>
-                <input type="date" class="exam-date-input" data-team="${t.id}" />
-              </div>
-              <button type="button" class="btn btn-blue add-exam-btn" data-team="${t.id}">+ Add</button>
-            </div>
 
             <span class="comment-label">Comment for team (sent as notification to all members)</span>
             <textarea class="comment-ta" data-team="${t.id}" placeholder="Comment text…"></textarea>
@@ -160,43 +120,6 @@
             </div>
           </div>`;
         }).join('')}</div>`;
-
-        // Add exam date
-        root.querySelectorAll('.add-exam-btn').forEach((btn) => {
-          btn.addEventListener('click', async () => {
-            const tid = +btn.getAttribute('data-team');
-            const inp = root.querySelector(`.exam-date-input[data-team="${tid}"]`);
-            if (!inp.value) return flash('Please select a date', false);
-            btn.disabled = true;
-            try {
-              await GPApi.addExamDate(tid, inp.value);
-              inp.value = '';
-              flash('Exam date added successfully.', true);
-              GPNav.updateUnreadBadge();
-              await load();
-            } catch (e) { flash(e.message, false); }
-            finally { btn.disabled = false; }
-          });
-        });
-
-        // Delete exam date
-        root.querySelectorAll('.del-exam-btn').forEach((btn) => {
-          btn.addEventListener('click', async () => {
-            const tid  = +btn.getAttribute('data-team');
-            const date = btn.getAttribute('data-date');
-            if (!confirm(`Remove exam date ${date}?`)) return;
-            btn.disabled = true;
-            try {
-              await GPApi.apiFetch(`/teams/${tid}/exam-dates/`, {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ date }),
-              });
-              flash('Exam date removed.', true);
-              await load();
-            } catch (e) { flash(e.message || 'Failed to remove date.', false); }
-          });
-        });
 
         // Open Chat button
         root.querySelectorAll('.open-chat-btn').forEach((btn) => {

@@ -22,20 +22,23 @@
     }
 
     table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 12px 10px; border-bottom: 1px solid #e2e8f0; font-size: 14px; text-align: left; }
-    th { font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid #e2e8f0; font-size: 14px; text-align: left; vertical-align: middle; }
+    th { font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: .4px; }
     tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
 
-    .btn { border: 0; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; transition: opacity 0.15s; }
+    .btn { border: 0; padding: 7px 14px; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 600; transition: opacity 0.15s; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-ok { background: #22c55e; color: #fff; }
-    .btn-ok:hover:not(:disabled) { background: #16a34a; }
-    .btn-no { background: #ef4444; color: #fff; margin-left: 6px; }
-    .btn-no:hover:not(:disabled) { background: #dc2626; }
+    .btn-ok  { background: #22c55e; color: #fff; }
+    .btn-ok:hover:not(:disabled)  { background: #16a34a; }
+    .btn-no  { background: #ef4444; color: #fff; }
+    .btn-no:hover:not(:disabled)  { background: #dc2626; }
+
+    .action-btns { display: flex; gap: 6px; align-items: center; }
 
     .status-badge {
       display: inline-block; font-size: 11px; font-weight: 600;
-      padding: 2px 8px; border-radius: 999px;
+      padding: 3px 10px; border-radius: 999px;
       background: #fef9c3; color: #854d0e;
     }
 
@@ -70,8 +73,8 @@
     </section>
   </main>
 
-  <script src="/api.js"></script>
-  <script src="/static/supervisor-common.js"></script>
+  <script src="/static/api.js?v=2"></script>
+  <script src="/static/supervisor-common.js?v=2"></script>
   <script>
     GPNav.mount('requests');
 
@@ -89,6 +92,25 @@
       return d.innerHTML;
     }
 
+    async function decide(id, decision, btn) {
+      if (btn) btn.disabled = true;
+      document.getElementById('msg').style.display = 'none';
+      try {
+        await GPApi.decideRequest(id, decision);
+        showMsg(
+          decision === 'approve'
+            ? 'Request approved and team assigned.'
+            : 'Rejection or pass recorded.',
+          true
+        );
+        GPNav.updateUnreadBadge();
+        await load();
+      } catch (e) {
+        showMsg(e.message, false);
+        if (btn) btn.disabled = false;
+      }
+    }
+
     async function load() {
       const tbody = document.getElementById('requestsBody');
       tbody.innerHTML = '<tr><td colspan="6" class="empty">Loading…</td></tr>';
@@ -98,42 +120,30 @@
           tbody.innerHTML = '<tr><td colspan="6" class="empty">No pending requests at the moment.</td></tr>';
           return;
         }
+
         tbody.innerHTML = rows.map((r) => `
           <tr data-id="${r.id}">
-            <td><strong>${esc(r.team_name || 'Team')}</strong></td>
+            <td style="font-weight:600;color:#1a237e">${esc(r.team_name || '—')}</td>
             <td>${esc(r.leader_name || '—')}</td>
             <td>${esc(r.project_idea || '—')}</td>
             <td><span class="status-badge">${esc(r.status)}</span></td>
             <td style="color:#64748b;font-size:12px">${esc((r.created_at || '').slice(0, 10))}</td>
             <td>
-              <button class="btn btn-ok"  data-act="approve" data-id="${r.id}">Approve</button>
-              <button class="btn btn-no"  data-act="reject"  data-id="${r.id}">Reject</button>
+              <div class="action-btns">
+                <button class="btn btn-ok" data-act="approve" data-id="${r.id}">Approve</button>
+                <button class="btn btn-no" data-act="reject"  data-id="${r.id}">Reject</button>
+              </div>
             </td>
           </tr>`).join('');
 
         tbody.querySelectorAll('button[data-act]').forEach((btn) => {
-          btn.addEventListener('click', async () => {
-            const id = +btn.getAttribute('data-id');
+          btn.addEventListener('click', () => {
+            const id       = +btn.getAttribute('data-id');
             const decision = btn.getAttribute('data-act');
-            btn.disabled = true;
-            document.getElementById('msg').style.display = 'none';
-            try {
-              const data = await GPApi.decideRequest(id, decision);
-              if (data.detail && !data.id) showMsg(data.detail, true);
-              else showMsg(
-                decision === 'approve'
-                  ? 'Request approved and team assigned.'
-                  : 'Rejection or pass recorded.',
-                true
-              );
-              GPNav.updateUnreadBadge();
-              await load();
-            } catch (e) {
-              showMsg(e.message, false);
-              btn.disabled = false;
-            }
+            decide(id, decision, btn);
           });
         });
+
       } catch (e) {
         tbody.innerHTML = `<tr><td colspan="6" class="empty">${esc(e.message)}</td></tr>`;
       }

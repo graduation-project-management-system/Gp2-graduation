@@ -210,6 +210,8 @@ button{
     <i class="fa fa-bars"></i>
 </div>
 
+<div id="sb-overlay" onclick="toggleMenu()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:999;"></div>
+
 <div class="sidebar" id="sidebar">
     <div class="close" onclick="toggleMenu()">
         <i class="fa fa-xmark"></i>
@@ -258,7 +260,7 @@ button{
     </button>
 </div>
 
-<script src="/api.js"></script>
+<script src="/static/api.js?v=2"></script>
 <script>
 /* ================= AUTH CHECK ================= */
 if (!GPApi.getAccess()) location.href = '/login.html';
@@ -311,10 +313,16 @@ checkLeadership();
 /* ================= SIDEBAR ================= */
 function toggleMenu(){
     let bar = document.getElementById("sidebar");
+    let btn = document.querySelector(".menu-btn");
+    let overlay = document.getElementById("sb-overlay");
     if(bar.style.left === "0px"){
         bar.style.left = "-260px";
+        btn.style.display = "flex";
+        if(overlay) overlay.style.display = "none";
     }else{
         bar.style.left = "0px";
+        btn.style.display = "none";
+        if(overlay) overlay.style.display = "block";
     }
 }
 
@@ -407,11 +415,11 @@ function handleFileSelect() {
 
     if (fileInput.files.length > 0) {
         selectedFile = fileInput.files[0];
-        const fileSize = (selectedFile.size / 1024).toFixed(1); 
+        const fileSize = (selectedFile.size / 1024).toFixed(1);
         fileNameText.innerText = `${selectedFile.name} (${fileSize} KB)`;
-        
+
         fileLabel.style.borderColor = "var(--main)";
-        fileLabel.style.background = "#f0fdf4"; 
+        fileLabel.style.background = "#f0fdf4";
     } else {
         selectedFile = null;
         fileNameText.innerText = "Choose File";

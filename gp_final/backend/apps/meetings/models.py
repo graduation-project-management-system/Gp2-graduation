@@ -52,6 +52,20 @@ class Meeting(models.Model):
         on_delete=models.CASCADE,
         limit_choices_to={'role': 'supervisor'},
     )
+    examiner1    = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='meetings_as_examiner1',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        limit_choices_to={'role': 'supervisor'},
+    )
+    examiner2    = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='meetings_as_examiner2',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        limit_choices_to={'role': 'supervisor'},
+    )
     team         = models.ForeignKey(
         'teams.Team',
         related_name='meetings',

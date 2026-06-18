@@ -308,8 +308,8 @@ class SubmitGradingReportUseCase:
         team_id:              int,
         phase:                GradingPhase,
         chief_grade:          float,
-        examiner_one_grade:   float,
-        examiner_two_grade:   float,
+        examiner_one_grade:   Optional[float],
+        examiner_two_grade:   Optional[float],
         feedback:             str,
     ) -> GradingReportEntity:
 
@@ -349,7 +349,7 @@ class SubmitGradingReportUseCase:
                 title='Grade submitted',
                 message=(
                     f'Dr. {supervisor_name} submitted your {phase.value} grade. '
-                    f'Final: {event.final_grade:.1f}/100'
+                    + (f'Final: {event.final_grade:.1f}/100' if event.final_grade is not None else 'Awaiting examiner grades.')
                 ),
                 notif_type='grade_published',
                 team_name=team.name,

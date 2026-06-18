@@ -474,6 +474,7 @@ ul { list-style: none; }
 .tag.green  { background: #f0fdf4; color: #166534; }
 .tag.blue   { background: #eff6ff; color: #1d4ed8; }
 .tag.amber  { background: #fffbeb; color: #92400e; }
+.tag.orange { background: #fff7ed; color: #c2410c; }
 .tag.red    { background: #fef2f2; color: #991b1b; }
 .tag.gray   { background: #f1f5f9; color: #64748b; }
 
@@ -945,6 +946,68 @@ tr:hover .action-btn { opacity: 1; }
 .modal-form input:focus {
   border-color: #3b6ed4;
   background: #fff;
+}
+
+.team-members-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.team-members-list {
+  width: 100%;
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.team-member-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  transition: background 0.2s ease;
+}
+
+.team-member-row + .team-member-row {
+  margin-top: 4px;
+}
+
+.team-member-row.disabled {
+  opacity: 0.6;
+}
+
+.team-member-row label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.team-member-row.disabled label {
+  cursor: not-allowed;
+}
+
+.team-member-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.team-member-row .team-member-name {
+  flex: 1;
+  font-size: 13px;
+  color: #1f2937;
+}
+
+.team-members-list .empty {
+  color: #64748b;
+  text-align: center;
+  padding: 16px 0;
 }
 
 .modal-error {
