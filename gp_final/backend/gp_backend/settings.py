@@ -107,8 +107,7 @@ USE_TZ        = True
 # Frontend files served as static files
 STATIC_URL       = '/static/'
 STATIC_ROOT      = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [FRONTEND_DIR]
-
+STATICFILES_DIRS = [FRONTEND_DIR] if FRONTEND_DIR.exists() else []
 MEDIA_URL  = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
