@@ -3,6 +3,8 @@ python manage.py seed_data
 
 Seeds ALL users from database.js (students + supervisors from JUST university),
 plus two demo teams ready to use immediately.
+
+FIXED: now resets the password every run, even if the user already exists.
 """
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
@@ -41,7 +43,7 @@ STUDENTS = [
 
 
 class Command(BaseCommand):
-    help = 'Seed all users from database.js and create demo teams.'
+    help = 'Seed all users from database.js and create demo teams. Always resets passwords.'
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.MIGRATE_HEADING('\n=== GP System — Seeding Database ===\n'))
@@ -49,7 +51,7 @@ class Command(BaseCommand):
         sup_objs = {}
         stu_objs = {}
 
-        # ── Create supervisors ────────────────────────────────────────────────
+        # ── Create / fix supervisors ──────────────────────────────────────────
         self.stdout.write(self.style.HTTP_INFO('-- Supervisors'))
         for s in SUPERVISORS:
             user, created = User.objects.get_or_create(
@@ -62,15 +64,18 @@ class Command(BaseCommand):
                     'is_active':    True,
                 },
             )
+            # FIX: always (re)set the password, whether the user is new or already existed
+            user.set_password(s['password'])
+            user.is_active = True
+            user.save()
+
             if created:
-                user.set_password(s['password'])
-                user.save()
                 self.stdout.write(f'  [+] Created supervisor: {user.display_name:25} ({user.email})')
             else:
-                self.stdout.write(f'  · Exists:  supervisor: {user.display_name:25} ({user.email})')
+                self.stdout.write(f'  [~] Reset password for supervisor: {user.display_name:25} ({user.email})')
             sup_objs[s['display_name']] = user
 
-        # ── Create students ───────────────────────────────────────────────────
+        # ── Create / fix students ─────────────────────────────────────────────
         self.stdout.write(self.style.HTTP_INFO('\n-- Students'))
         for s in STUDENTS:
             user, created = User.objects.get_or_create(
@@ -81,17 +86,21 @@ class Command(BaseCommand):
                     'is_active':    True,
                 },
             )
+            # FIX: always (re)set the password, whether the user is new or already existed
+            user.set_password(s['password'])
+            user.is_active = True
+            user.save()
+
             if created:
-                user.set_password(s['password'])
-                user.save()
                 self.stdout.write(f'  [+] Created student: {user.display_name:20} ({user.email})')
             else:
-                self.stdout.write(f'  · Exists:  student: {user.display_name:20} ({user.email})')
+                self.stdout.write(f'  [~] Reset password for student: {user.display_name:20} ({user.email})')
             stu_objs[s['display_name']] = user
 
         # ── Admin superuser ───────────────────────────────────────────────────
         self.stdout.write(self.style.HTTP_INFO('\n-- Admin'))
-        if not User.objects.filter(email='admin@just.edu.jo').exists():
+        admin_user = User.objects.filter(email='admin@just.edu.jo').first()
+        if admin_user is None:
             User.objects.create_superuser(
                 email='admin@just.edu.jo',
                 password='Admin@GP2025',
@@ -100,11 +109,17 @@ class Command(BaseCommand):
             )
             self.stdout.write('  [+] Created superuser: admin@just.edu.jo / Admin@GP2025')
         else:
-            self.stdout.write('  · Admin already exists.')
+            # FIX: always (re)set the password for the admin too
+            admin_user.set_password('Admin@GP2025')
+            admin_user.is_active = True
+            admin_user.is_staff = True
+            admin_user.is_superuser = True
+            admin_user.save()
+            self.stdout.write('  [~] Reset password for superuser: admin@just.edu.jo / Admin@GP2025')
 
         # Summary table
         self.stdout.write(self.style.SUCCESS('\n' + '='*60))
-        self.stdout.write(self.style.SUCCESS('  Database seeded successfully!\n'))
+        self.stdout.write(self.style.SUCCESS('  Database seeded / passwords reset successfully!\n'))
         self.stdout.write('  SUPERVISOR LOGIN CREDENTIALS')
         for s in SUPERVISORS:
             self.stdout.write(f'    {s["email"]}  /  {s["password"]}')
