@@ -2722,14 +2722,19 @@ window.renderGrades = renderGrades;
 /* ============================================
    INIT — render dynamic sections on load
    ============================================ */
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   bindHeaderActionButtons();
-  loadDashboardStats();
-  loadProposals();
-  loadTeams();
-  loadStudents();
-  loadSupervisors();
-  loadDefense();
-  loadGrades();
-  loadActivity();
+  document.body.style.opacity = '0.5';
+  await Promise.all([
+    loadDashboardStats(),
+    loadProposals(),
+    loadTeams(),
+    loadStudents(),
+    loadSupervisors(),
+    loadDefense(),
+    loadGrades(),
+    loadActivity(),
+  ]);
+  document.body.style.opacity = '1';
 });
+ 
