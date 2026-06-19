@@ -35,6 +35,30 @@ INSTALLED_APPS = [
     'apps.files',
     'apps.supervisor_context',
     'apps.chat',
+    INSTALLED_APPS = [
+    'daphne',
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
+    'corsheaders',
+    'channels',
+    'apps.accounts',
+    'apps.teams',
+    'apps.requests',
+    'apps.meetings',
+    'apps.grading',
+    'apps.notifications',
+    'apps.files',
+    'apps.supervisor_context',
+    'apps.chat',
+    'apps.activity',     
+]
 ]
 
 MIDDLEWARE = [
