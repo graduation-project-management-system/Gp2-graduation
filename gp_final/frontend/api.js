@@ -98,7 +98,7 @@
     if (!res.ok) return false; // refresh token is invalid or expired
 
     const data = await res.json();
-    setTokens(data.access, null); // only save the new access token, keep the same refresh token
+   setTokens(data.access, data.refresh); // only save the new access token, keep the same refresh token
     return true;
   }
 
