@@ -13,7 +13,7 @@ SECRET_KEY = 'django-insecure-gp-just-edu-jo-2025-windows-only-xyz'
 DEBUG       = True
 ALLOWED_HOSTS = ['*']
 
-    INSTALLED_APPS = [
+INSTALLED_APPS = [
     'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
