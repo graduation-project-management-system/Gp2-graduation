@@ -213,8 +213,7 @@ function renderProposals() {
     const matchFilter = proposalFilter === "All" || statusLabel === proposalFilter;
     return matchSearch && matchFilter;
   });
-
-  tbody.innerHTML = rows.length === 0
+const newProposalsHTML = rows.length === 0
     ? `<tr><td colspan="7" style="text-align:center;padding:32px;color:#94a3b8;">No proposals found.</td></tr>`
     : rows.map(p => {
         const statusLabel = normalizeProposalStatus(p.status);
@@ -257,6 +256,7 @@ function renderProposals() {
         `;
       }).join("");
 
+  if (tbody.innerHTML !== newProposalsHTML) tbody.innerHTML = newProposalsHTML;
   updateProposalCounts();
 }
 
@@ -1020,7 +1020,7 @@ function renderStudents() {
     return matchSearch && matchTeam;
   });
 
-  tbody.innerHTML = rows.length === 0
+  const newStudentsHTML = rows.length === 0
     ? `<tr><td colspan="7" style="text-align:center;padding:32px;color:#94a3b8;">No students found.</td></tr>`
     : rows.map(s => {
         const initials = s.name.split(" ").map(w => w[0]).join("").slice(0, 2);
@@ -1049,6 +1049,7 @@ function renderStudents() {
         `;
       }).join("");
 
+  if (tbody.innerHTML !== newStudentsHTML) tbody.innerHTML = newStudentsHTML;
   updateStudentStats();
 }
 
@@ -1362,7 +1363,7 @@ function renderTeams() {
     !(team.is_archived === true || String(team.is_archived || "").toLowerCase() === "true")
   );
 
-  tbody.innerHTML = activeTeams.length === 0
+  const newTeamsHTML = activeTeams.length === 0
     ? `<tr><td colspan="7" style="text-align:center;padding:32px;color:#94a3b8;">No teams found.</td></tr>`
     : activeTeams.map((team) => {
         const teamStatusClass = normalizeTeamStatus(team.status);
@@ -1398,7 +1399,8 @@ function renderTeams() {
             </td>
           </tr>
         `;
-      }).join("");
+     }).join("");
+  if (tbody.innerHTML !== newTeamsHTML) tbody.innerHTML = newTeamsHTML;
   updateTeamToolbarStats();
 }
 
@@ -2306,7 +2308,7 @@ function renderGrades() {
     return matchSearch && matchFilter;
   });
 
-  tbody.innerHTML = rows.length === 0
+  const newGradesHTML = rows.length === 0
     ? `<tr><td colspan="10" style="text-align:center;padding:32px;color:#94a3b8;">No grades found.</td></tr>`
     : rows.map(g => {
         const statusLabel = normalizeGradeStatus(g.status);
@@ -2362,6 +2364,7 @@ function renderGrades() {
         `;
       }).join("");
 
+  if (tbody.innerHTML !== newGradesHTML) tbody.innerHTML = newGradesHTML;
   updateGradeCounts();
 }
 
