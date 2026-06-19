@@ -58,7 +58,7 @@ INSTALLED_APPS = [
     'apps.supervisor_context',
     'apps.chat',
     'apps.activity',     
-]
+
 ]
 
 MIDDLEWARE = [
