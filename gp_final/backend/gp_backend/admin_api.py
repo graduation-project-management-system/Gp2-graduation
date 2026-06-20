@@ -411,14 +411,15 @@ def activity_list(request):
         })
 
     from apps.grading.models import GradingReport
-    for g in GradingReport.objects.select_related('team', 'supervisor').order_by('-created_at')[:20]:
-        activities.append({
-            'action':       'Grade submitted',
-            'description':  f'{g.team.name if g.team else "Team"} — Final grade: {float(g.final_grade):.1f}%',
-            'created_at':   g.created_at.isoformat(),
-            'related_type': 'defense',
-            'created_by':   g.supervisor.display_name if g.supervisor else 'Supervisor',
-        })
+ for g in GradingReport.objects.select_related('team', 'supervisor').order_by('-created_at')[:20]:
+    grade_str = f'{float(g.final_grade):.1f}%' if g.final_grade is not None else 'N/A'
+    activities.append({
+        'action':       'Grade submitted',
+        'description':  f'{g.team.name if g.team else "Team"} — Final grade: {grade_str}',
+        'created_at':   g.created_at.isoformat(),
+        'related_type': 'defense',
+        'created_by':   g.supervisor.display_name if g.supervisor else 'Supervisor',
+    })
 
     activities.sort(key=lambda x: x['created_at'], reverse=True)
     return Response({'success': True, 'activities': activities[:100]})
