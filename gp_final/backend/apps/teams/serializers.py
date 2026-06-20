@@ -143,12 +143,10 @@ class TeamUpdateSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False
     )
-
-    class Meta:
-        model  = Team
-        fields = ['project_title', 'project_description', 'status', 'progress', 'academic_year', 'member_ids']
-        extra_kwargs = {f: {'required': False} for f in fields}
-
+class Meta:
+    model  = Team
+    fields = ['project_title', 'project_description', 'status', 'progress', 'academic_year', 'member_ids', 'assigned_supervisor']
+    extra_kwargs = {f: {'required': False} for f in ['project_title', 'project_description', 'status', 'progress', 'academic_year', 'member_ids', 'assigned_supervisor']}
     def validate_member_ids(self, value):
         if value is None:
             return value
