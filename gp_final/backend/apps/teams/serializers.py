@@ -143,30 +143,31 @@ class TeamUpdateSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False
     )
-class Meta:
-    model  = Team
-    fields = ['project_title', 'project_description', 'status', 'progress', 'academic_year', 'member_ids', 'assigned_supervisor']
-    extra_kwargs = {f: {'required': False} for f in ['project_title', 'project_description', 'status', 'progress', 'academic_year', 'member_ids', 'assigned_supervisor']}
+    assigned_supervisor = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(role='supervisor'),
+        required=False,
+        allow_null=True
+    )
+
+    class Meta:
+        model  = Team
+        fields = ['project_title', 'project_description', 'status', 'progress', 'academic_year', 'member_ids', 'assigned_supervisor']
+        extra_kwargs = {f: {'required': False} for f in ['project_title', 'project_description', 'status', 'progress', 'academic_year', 'member_ids']}
+
     def validate_member_ids(self, value):
         if value is None:
             return value
-
         if len(value) > 5:
             raise serializers.ValidationError('Maximum 5 members allowed.')
-
         if len(value) != len(set(value)):
             raise serializers.ValidationError('Duplicate member IDs.')
-
         User = get_user_model()
         members = User.objects.filter(pk__in=value)
         if members.count() != len(value):
             raise serializers.ValidationError('One or more member IDs do not exist.')
-
         for member in members:
             if member.role != UserRole.STUDENT:
                 raise serializers.ValidationError(f'User {member.id} is not a student.')
-
-        # NEW: Check that no member is already in a different team
         current_team_id = self.instance.pk if self.instance else None
         for member in members:
             other_team = Team.objects.filter(members=member).exclude(pk=current_team_id).first()
@@ -174,7 +175,6 @@ class Meta:
                 raise serializers.ValidationError(
                     f'Student {member.display_name} is already a member of team "{other_team.name}".'
                 )
-
         return value
 
     def update(self, instance, validated_data):
