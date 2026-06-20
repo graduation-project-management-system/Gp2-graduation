@@ -115,7 +115,6 @@ class Grade(models.Model):
             self.final_grade = (self.supervisor_grade * 0.5) + (self.committee1_grade * 0.25) + (self.committee2_grade * 0.25)
         else:
             self.final_grade = None
-
     def calculate_letter_grade(self) -> None:
         """Generate detailed letter grade based on final grade"""
         if self.final_grade is None:
@@ -123,27 +122,27 @@ class Grade(models.Model):
             return
         
         final = float(self.final_grade)
-        if final >= 97:
+        if final >= 95:
             self.letter_grade = 'A+'
-        elif final >= 93:
+        elif final >= 85:
             self.letter_grade = 'A'
-        elif final >= 90:
-            self.letter_grade = 'A-'
-        elif final >= 87:
-            self.letter_grade = 'B+'
-        elif final >= 83:
-            self.letter_grade = 'B'
         elif final >= 80:
-            self.letter_grade = 'B-'
+            self.letter_grade = 'A-'
         elif final >= 77:
-            self.letter_grade = 'C+'
+            self.letter_grade = 'B+'
         elif final >= 73:
-            self.letter_grade = 'C'
+            self.letter_grade = 'B'
         elif final >= 70:
-            self.letter_grade = 'C-'
+            self.letter_grade = 'B-'
         elif final >= 67:
-            self.letter_grade = 'D+'
+            self.letter_grade = 'C+'
+        elif final >= 63:
+            self.letter_grade = 'C'
         elif final >= 60:
+            self.letter_grade = 'C-'
+        elif final >= 57:
+            self.letter_grade = 'D+'
+        elif final >= 50:
             self.letter_grade = 'D'
         else:
             self.letter_grade = 'F'
